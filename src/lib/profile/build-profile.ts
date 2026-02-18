@@ -1,8 +1,9 @@
-import type { FrequencyProfile, Overtone } from '@/lib/types';
+import type { FrequencyProfile, Overtone, VocalQualities } from '@/lib/types';
 import { frequencyToNote } from '@/lib/music/note-mapping';
 import { frequencyToChakra } from '@/lib/music/chakra-mapping';
 import { getPerfectFifth, getMinorThird } from '@/lib/music/intervals';
 import { calculateRichness } from '@/lib/audio/overtone-analysis';
+import { calculateChakraScores } from '@/lib/audio/chakra-analysis';
 
 /**
  * Calculate tonal stability from a buffer of frequency readings.
@@ -10,7 +11,6 @@ import { calculateRichness } from '@/lib/audio/overtone-analysis';
  * Stability = clamp(1 - CV * 10, 0, 1).
  */
 export function calculateStability(readings: number[]): number {
-  // Filter out silence markers (-1)
   const valid = readings.filter((r) => r > 0);
   if (valid.length < 2) return 0;
 
@@ -62,16 +62,41 @@ function averageOvertones(snapshots: Overtone[][]): Overtone[] {
 }
 
 /**
+ * Average frequency data snapshots for final chakra scoring.
+ */
+function averageFrequencyData(snapshots: Float32Array[]): Float32Array {
+  if (snapshots.length === 0) return new Float32Array(0);
+  const length = snapshots[0].length;
+  const averaged = new Float32Array(length);
+
+  for (let i = 0; i < length; i++) {
+    let sum = 0;
+    for (const snapshot of snapshots) {
+      sum += snapshot[i];
+    }
+    averaged[i] = sum / snapshots.length;
+  }
+
+  return averaged;
+}
+
+export interface RecordingData {
+  readings: number[];
+  overtoneSnapshots: Overtone[][];
+  frequencyDataSnapshots: Float32Array[];
+  vocalQualities: VocalQualities;
+  sampleRate: number;
+  fftSize: number;
+}
+
+/**
  * Build a complete FrequencyProfile from raw recording data.
  */
-export function buildProfile(
-  readings: number[],
-  overtoneSnapshots: Overtone[][],
-): FrequencyProfile {
-  // Filter out silence readings
+export function buildProfile(data: RecordingData): FrequencyProfile {
+  const { readings, overtoneSnapshots, frequencyDataSnapshots, vocalQualities, sampleRate, fftSize } = data;
+
   const validReadings = readings.filter((r) => r > 0);
 
-  // Average fundamental frequency
   const fundamental =
     validReadings.length > 0
       ? Math.round((validReadings.reduce((a, b) => a + b, 0) / validReadings.length) * 10) / 10
@@ -85,6 +110,18 @@ export function buildProfile(
   const fifth = getPerfectFifth(fundamental);
   const third = getMinorThird(fundamental);
 
+  // Full 7-chakra scoring using averaged frequency data
+  const avgFreqData = averageFrequencyData(frequencyDataSnapshots);
+  const chakraScores =
+    avgFreqData.length > 0
+      ? calculateChakraScores(avgFreqData, fundamental, overtones, vocalQualities, richness, sampleRate, fftSize)
+      : [];
+
+  const dominantChakra =
+    chakraScores.length > 0
+      ? chakraScores.reduce((a, b) => (b.score > a.score ? b : a))
+      : { name: chakra.name, color: chakra.color, score: 0, label: 'Quiet', description: '' };
+
   return {
     fundamental,
     noteInfo,
@@ -95,5 +132,8 @@ export function buildProfile(
     fifth,
     third,
     timestamp: new Date(),
+    chakraScores,
+    vocalQualities,
+    dominantChakra,
   };
 }

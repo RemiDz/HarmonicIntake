@@ -13,6 +13,23 @@ export interface ChakraInfo {
   intention: string;
 }
 
+export interface ChakraScore {
+  name: string;
+  color: string;
+  score: number;
+  label: string;
+  description: string;
+}
+
+export interface VocalQualities {
+  rmsEnergy: number;
+  stability: number;
+  spectralCentroid: number;
+  spectralSpread: number;
+  harmonicToNoise: number;
+  dynamicRange: number;
+}
+
 export interface Overtone {
   harmonic: number;
   freq: number;
@@ -35,6 +52,9 @@ export interface FrequencyProfile {
   fifth: IntervalInfo;
   third: IntervalInfo;
   timestamp: Date;
+  chakraScores: ChakraScore[];
+  vocalQualities: VocalQualities;
+  dominantChakra: ChakraScore;
 }
 
 export type AppScreen = 'idle' | 'countdown' | 'recording' | 'complete';
@@ -47,4 +67,5 @@ export interface RealTimeData {
   overtones: Overtone[];
   spectrumData: number[];
   elapsed: number;
+  chakraScores: ChakraScore[];
 }

@@ -12,7 +12,8 @@ export default function Home() {
   const { screen, realTimeData, profile, error, start, stop, reset, beginRecording } =
     useAudioAnalysis();
 
-  const accentColor = realTimeData.currentChakra?.color || profile?.chakra.color;
+  const accentColor =
+    realTimeData.currentChakra?.color || profile?.dominantChakra.color;
 
   return (
     <main className="relative min-h-screen">
