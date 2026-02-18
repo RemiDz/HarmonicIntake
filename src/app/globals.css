@@ -1,0 +1,138 @@
+@import 'tailwindcss';
+
+/* ── Design System Tokens ── */
+
+@theme {
+  --color-bg-deep: #050c15;
+  --color-bg-mid: #091623;
+  --color-bg-surface: #0d1e30;
+  --color-bg-card: #0a1520;
+  --color-border: #162535;
+  --color-border-hover: #1a2e42;
+
+  --color-text-primary: #d8e8f5;
+  --color-text-secondary: #8aa5bb;
+  --color-text-muted: #507090;
+  --color-text-dim: #3a5570;
+
+  --color-chakra-root: #E24B4B;
+  --color-chakra-sacral: #F0913A;
+  --color-chakra-solar: #F5D547;
+  --color-chakra-heart: #5ABF7B;
+  --color-chakra-throat: #4FA8D6;
+  --color-chakra-third-eye: #7B6DB5;
+  --color-chakra-crown: #C77DBA;
+
+  --color-accent-primary: #4FA8D6;
+  --color-accent-secondary: #7B6DB5;
+  --color-success: #5ABF7B;
+  --color-warning: #F0913A;
+  --color-error: #E24B4B;
+
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-mono: 'DM Mono', 'Courier New', monospace;
+  --font-body: system-ui, -apple-system, sans-serif;
+}
+
+/* ── Base Styles ── */
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-bg-deep);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* ── Keyframe Animations ── */
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.5;
+  }
+}
+
+@keyframes scale-pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rotate-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Utility Classes ── */
+
+.text-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-text-muted) 0%,
+    var(--color-text-primary) 25%,
+    var(--color-accent-primary) 50%,
+    var(--color-text-primary) 75%,
+    var(--color-text-muted) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s ease-in-out infinite;
+}
+
+.animate-breathe {
+  animation: breathe 6s ease-in-out infinite;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.animate-scale-pop {
+  animation: scale-pop 0.5s ease-out forwards;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
