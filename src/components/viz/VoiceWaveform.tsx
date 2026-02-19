@@ -50,14 +50,15 @@ export default function VoiceWaveform({
     const centerY = H / 2;
     const color = chakraColor || '#4FA8D6';
 
-    // Max amplitude = 80% of canvas height (40% each side of center)
-    const maxAmp = H * 0.4;
+    // Max amplitude = 90% of canvas height (45% each side of center).
+    // Raw sine output is normalised to [-1,1] below so peaks stay in bounds.
+    const maxAmp = H * 0.45;
 
     // Animation speed per mode
     const speed = mode === 'idle' ? 0.3 : mode === 'result' ? 0.05 : 0.8;
 
-    // Audio-reactive boost during recording
-    const boost = mode === 'recording' ? Math.max(0.5, rmsEnergy * 5) : 1.0;
+    // Audio-reactive boost during recording (capped so waves stay in bounds)
+    const boost = mode === 'recording' ? Math.min(Math.max(0.5, rmsEnergy * 5), 1.1) : 1.0;
 
     ctx.clearRect(0, 0, W, H);
 
@@ -99,13 +100,20 @@ export default function VoiceWaveform({
         // Slow organic drift
         y += 0.2 * Math.sin(t * Math.PI * 1.5 + time * speed * 0.7 + line * 0.5);
 
+        // Normalise the combined sines (peak sum ≈ 1.5) to [-1, 1]
+        y /= 1.5;
+
         // Mix in real audio data during recording
         if (timeDomainData && timeDomainData.length > 0 && mode === 'recording') {
           const idx = Math.floor(t * (timeDomainData.length - 1));
-          y += (timeDomainData[idx] || 0) * 2;
+          y += (timeDomainData[idx] || 0) * 1.5;
         }
 
-        // Rule 5 + 6: apply envelope and max amplitude
+        // Clamp to [-1, 1] so peaks never exceed canvas bounds
+        if (y > 1) y = 1;
+        else if (y < -1) y = -1;
+
+        // Apply envelope and max amplitude
         const finalY = centerY + y * maxAmp * envelope * boost;
 
         if (i === 0) {

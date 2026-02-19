@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { ChakraScore } from '@/lib/types';
 
@@ -17,6 +18,41 @@ const POSITIONS = [
   { y: 100, label: 'Third Eye' },
   { y: 70, label: 'Crown' },
 ];
+
+const STAGGER_DELAY = 0.15; // 150ms between each chakra
+
+/** Counts from 0 to `value` over `duration` ms, starting after `delay` ms */
+function CountingScore({ value, delay }: { value: number; delay: number }) {
+  const [display, setDisplay] = useState(0);
+
+  useEffect(() => {
+    const duration = 800;
+    const timeout = setTimeout(() => {
+      const start = performance.now();
+      let raf: number;
+      const tick = (now: number) => {
+        const t = Math.min((now - start) / duration, 1);
+        // ease-out cubic for smooth deceleration
+        const eased = 1 - Math.pow(1 - t, 3);
+        setDisplay(Math.round(value * eased));
+        if (t < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      return () => cancelAnimationFrame(raf);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+
+  return <>{display}%</>;
+}
+
+// Spring config that gives a slight overshoot then settle (ease-out-back feel)
+const circleSpring = {
+  type: 'spring' as const,
+  stiffness: 260,
+  damping: 18,
+  mass: 1,
+};
 
 export function ChakraBodyMap({ scores }: ChakraBodyMapProps) {
   // Scores are Root→Crown, positions are Root(bottom)→Crown(top) — same order
@@ -52,32 +88,35 @@ export function ChakraBodyMap({ scores }: ChakraBodyMapProps) {
           const radius = 8 + (score.score / 100) * 16; // 8-24px
           const opacity = 0.3 + (score.score / 100) * 0.7; // 0.3-1.0
           const glowRadius = radius * 2.5;
+          const delay = i * STAGGER_DELAY;
 
           return (
             <g key={score.name}>
-              {/* Glow */}
+              {/* Glow — scales up with spring + fades in */}
               <motion.circle
                 cx={140}
                 cy={pos.y}
-                r={glowRadius}
                 fill={score.color}
-                opacity={opacity * 0.15}
-                initial={{ r: 0 }}
-                animate={{ r: glowRadius }}
-                transition={{ duration: 0.6, delay: i * 0.08 }}
+                initial={{ r: 0, opacity: 0 }}
+                animate={{ r: glowRadius, opacity: opacity * 0.15 }}
+                transition={{
+                  r: { ...circleSpring, delay },
+                  opacity: { duration: 0.6, delay },
+                }}
               />
-              {/* Main circle */}
+              {/* Main circle — spring scale with overshoot */}
               <motion.circle
                 cx={140}
                 cy={pos.y}
-                r={radius}
                 fill={score.color}
-                opacity={opacity}
-                initial={{ r: 0 }}
-                animate={{ r: radius }}
-                transition={{ duration: 0.4, delay: i * 0.08 }}
+                initial={{ r: 0, opacity: 0 }}
+                animate={{ r: radius, opacity }}
+                transition={{
+                  r: { ...circleSpring, delay },
+                  opacity: { duration: 0.6, delay },
+                }}
               />
-              {/* Score text — left side */}
+              {/* Score text — left side (counting number) */}
               <motion.text
                 x={82}
                 y={pos.y + 4}
@@ -87,9 +126,9 @@ export function ChakraBodyMap({ scores }: ChakraBodyMapProps) {
                 fontFamily="var(--font-mono)"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 + i * 0.08 }}
+                transition={{ duration: 0.3, delay }}
               >
-                {score.score}%
+                <CountingScore value={score.score} delay={delay * 1000} />
               </motion.text>
               {/* Label — right side */}
               <motion.text
@@ -100,7 +139,7 @@ export function ChakraBodyMap({ scores }: ChakraBodyMapProps) {
                 fontFamily="var(--font-mono)"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 + i * 0.08 }}
+                transition={{ duration: 0.3, delay }}
               >
                 {pos.label}
               </motion.text>
