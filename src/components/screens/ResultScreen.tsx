@@ -13,6 +13,8 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { CountingNumber } from '@/components/ui/CountingNumber';
+import { PlayableTone } from '@/components/ui/PlayableTone';
+import { useTonePlayer } from '@/hooks/useTonePlayer';
 import { generateHTMLReport } from '@/lib/share/generate-report';
 import { generateShareCard } from '@/lib/share/generate-card';
 import { formatHumanEmailSubject, formatHumanEmailBody } from '@/lib/profile/humanize';
@@ -61,6 +63,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
   const vp = profile.voiceProfile;
   const positions = getQualityPositions(profile);
   const [generatingCard, setGeneratingCard] = useState(false);
+  const { state: toneState, play: playTone, stop: stopTone } = useTonePlayer();
 
   const handleViewReport = () => generateHTMLReport(profile);
 
@@ -318,44 +321,66 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Card>
         </motion.div>
 
-        {/* ── Session Guidance ── */}
+        {/* ── Session Guidance: Playable Tones ── */}
         <motion.div variants={fadeInUp}>
           <Card className="p-4">
             <p className="mb-3 text-[10px] tracking-wider text-text-dim uppercase">
               Session Guidance
             </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-bg-mid p-3">
-                <p className="text-[10px] text-text-dim">Grounding Tone</p>
-                <p className="mt-0.5 font-mono text-sm text-text-primary">
-                  {profile.noteInfo.note}
-                  {profile.noteInfo.octave}
-                </p>
-                <p className="text-[10px] text-text-muted">for deep resonance</p>
-              </div>
-              <div className="rounded-xl bg-bg-mid p-3">
-                <p className="text-[10px] text-text-dim">Overtone Richness</p>
-                <p className="mt-0.5 font-mono text-sm text-text-primary">
-                  <CountingNumber value={profile.richness} suffix="%" duration={800} />
-                </p>
-                <p className="text-[10px] text-text-muted">{getRichnessLabel(profile.richness)}</p>
-              </div>
-              <div className="rounded-xl bg-bg-mid p-3">
-                <p className="text-[10px] text-text-dim">Expansion Tone</p>
-                <p className="mt-0.5 font-mono text-sm text-text-primary">
-                  {profile.fifth.note.note}
-                  {profile.fifth.note.octave}
-                </p>
-                <p className="text-[10px] text-text-muted">perfect 5th</p>
-              </div>
-              <div className="rounded-xl bg-bg-mid p-3">
-                <p className="text-[10px] text-text-dim">Release Tone</p>
-                <p className="mt-0.5 font-mono text-sm text-text-primary">
-                  {profile.third.note.note}
-                  {profile.third.note.octave}
-                </p>
-                <p className="text-[10px] text-text-muted">minor 3rd</p>
-              </div>
+            <div className="space-y-2">
+              <PlayableTone
+                id="grounding"
+                label="Grounding Tone"
+                note={`${profile.noteInfo.note}${profile.noteInfo.octave}`}
+                frequency={profile.fundamental}
+                description="Matches your natural resonance — for deep grounding"
+                duration={10}
+                accentColor={profile.dominantChakra.color}
+                isPlaying={toneState.activeId === 'grounding'}
+                progress={toneState.activeId === 'grounding' ? toneState.progress : 0}
+                onPlay={() => playTone('grounding', { frequency: profile.fundamental, duration: 10 })}
+                onStop={stopTone}
+              />
+              <PlayableTone
+                id="expansion"
+                label="Expansion Tone"
+                note={`${profile.fifth.note.note}${profile.fifth.note.octave}`}
+                frequency={profile.fifth.freq}
+                description="A perfect fifth above — opens and lifts your energy"
+                duration={10}
+                accentColor={profile.dominantChakra.color}
+                isPlaying={toneState.activeId === 'expansion'}
+                progress={toneState.activeId === 'expansion' ? toneState.progress : 0}
+                onPlay={() => playTone('expansion', { frequency: profile.fifth.freq, duration: 10 })}
+                onStop={stopTone}
+              />
+              <PlayableTone
+                id="release"
+                label="Release Tone"
+                note={`${profile.third.note.note}${profile.third.note.octave}`}
+                frequency={profile.third.freq}
+                description="A minor third — supports emotional softening and release"
+                duration={10}
+                accentColor={profile.dominantChakra.color}
+                isPlaying={toneState.activeId === 'release'}
+                progress={toneState.activeId === 'release' ? toneState.progress : 0}
+                onPlay={() => playTone('release', { frequency: profile.third.freq, duration: 10 })}
+                onStop={stopTone}
+              />
+              <PlayableTone
+                id="binaural"
+                label="Binaural Support"
+                note="7.83 Hz"
+                frequency={profile.fundamental}
+                description="Schumann Resonance — Earth's natural pulse for deep calm"
+                duration={30}
+                binaural
+                accentColor={profile.dominantChakra.color}
+                isPlaying={toneState.activeId === 'binaural'}
+                progress={toneState.activeId === 'binaural' ? toneState.progress : 0}
+                onPlay={() => playTone('binaural', { frequency: profile.fundamental, duration: 30, binaural: true })}
+                onStop={stopTone}
+              />
             </div>
             <div className="mt-3 rounded-xl bg-bg-mid p-3">
               <p className="text-[10px] text-text-dim">Instruments</p>
