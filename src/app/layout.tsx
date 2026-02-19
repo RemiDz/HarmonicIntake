@@ -1,6 +1,7 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, DM_Mono } from 'next/font/google';
 import './globals.css';
+import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -16,10 +17,18 @@ const dmMono = DM_Mono({
   display: 'swap',
 });
 
+export const viewport: Viewport = {
+  themeColor: '#050c15',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
 export const metadata: Metadata = {
+  metadataBase: new URL('https://harmonicintake.com'),
   title: 'Harmonic Intake — Vocal Frequency Analysis for Practitioners',
   description:
-    'Real-time vocal frequency profiling tool for sound healers, psychotherapists, and wellness practitioners. Analyse fundamental frequency, overtones, chakra resonance, and get personalised session recommendations. Free, no sign-up, runs in your browser.',
+    'Discover your unique frequency profile in 15 seconds. Real-time vocal analysis with 10 biomarkers, chakra energy mapping, and personalised sound healing guidance. Free, no sign-up, runs in your browser.',
   keywords: [
     'sound healing',
     'frequency analysis',
@@ -28,18 +37,49 @@ export const metadata: Metadata = {
     'overtones',
     'sound therapy',
     'wellness tool',
+    'voice analysis',
+    'binaural beats',
   ],
-  openGraph: {
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
     title: 'Harmonic Intake',
-    description: "Discover your client's frequency fingerprint",
+  },
+  openGraph: {
+    title: 'Harmonic Intake — Vocal Frequency Analysis',
+    description:
+      'Discover your unique frequency profile in 15 seconds. Real-time vocal analysis for sound healing practitioners.',
     type: 'website',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Harmonic Intake — Discover your frequency',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Harmonic Intake — Vocal Frequency Analysis',
+    description:
+      'Discover your unique frequency profile in 15 seconds. Real-time vocal analysis for sound healing practitioners.',
+    images: ['/og-image.png'],
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${cormorant.variable} ${dmMono.variable}`}>
-      <body>{children}</body>
+      <head>
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
+      </head>
+      <body>
+        {children}
+        <ServiceWorkerRegistrar />
+      </body>
     </html>
   );
 }

@@ -138,6 +138,11 @@ export function ParticleField({ mode, accentColor, rmsEnergy = 0 }: ParticleFiel
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Respect prefers-reduced-motion — don't animate particles
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
       const w = window.innerWidth;

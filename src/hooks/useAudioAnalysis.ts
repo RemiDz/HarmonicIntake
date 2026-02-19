@@ -15,6 +15,7 @@ import { buildProfile } from '@/lib/profile/build-profile';
 import { startRecording, type AudioRecorderHandle } from '@/lib/audio/recorder';
 import { getRMSEnergy } from '@/lib/audio/vocal-qualities';
 import { calculateLiveChakraScores } from '@/lib/scoring/chakra-scoring';
+import { playTing, playChord, hapticBuzz, hapticDoubleBuzz } from '@/lib/audio/ui-sounds';
 
 const RECORDING_DURATION = 15;
 const STABILITY_WINDOW = 30;
@@ -85,10 +86,12 @@ export function useAudioAnalysis() {
 
       setProfile(result);
       setScreen('analysing');
+      hapticDoubleBuzz();
 
       // Transition to complete after 1.8s "analysing" moment
       analysingTimerRef.current = setTimeout(() => {
         setScreen('complete');
+        playChord();
       }, 1800);
     },
     [],
@@ -216,6 +219,8 @@ export function useAudioAnalysis() {
       setScreen('recording');
       startTimeRef.current = performance.now();
       rafRef.current = requestAnimationFrame(analysisLoop);
+      hapticBuzz();
+      playTing();
     } catch (err) {
       cleanup();
       setScreen('idle');

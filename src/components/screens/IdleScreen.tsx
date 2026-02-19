@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Mic } from 'lucide-react';
+import { Mic, AudioWaveform, Activity, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
@@ -15,6 +15,24 @@ const steps = [
   { num: '01', text: 'Hum a comfortable, sustained tone into your device' },
   { num: '02', text: 'Hold for 15 seconds while we analyse the frequency' },
   { num: '03', text: 'Receive your personalised Frequency Profile' },
+];
+
+const howItWorks = [
+  {
+    icon: AudioWaveform,
+    title: 'Unique frequency signature',
+    text: 'Your voice carries a one-of-a-kind frequency pattern — like a musical thumbprint.',
+  },
+  {
+    icon: Activity,
+    title: '10 vocal biomarkers',
+    text: 'We analyse jitter, shimmer, harmonics, formants, and more in just 15 seconds.',
+  },
+  {
+    icon: Sparkles,
+    title: 'Personalised guidance',
+    text: 'Receive sound healing recommendations matched to your unique voice profile.',
+  },
 ];
 
 const stagger = {
@@ -102,6 +120,22 @@ export function IdleScreen({ onStart, error }: IdleScreenProps) {
             <Mic size={18} />
             Begin Analysis
           </Button>
+        </motion.div>
+
+        {/* How It Works — horizontal scroll cards */}
+        <motion.div variants={fadeInUp} className="-mx-6">
+          <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-6 pb-2 scrollbar-hide">
+            {howItWorks.map((card) => (
+              <div
+                key={card.title}
+                className="w-[260px] flex-shrink-0 snap-center rounded-xl border border-border/50 bg-bg-card/60 p-4 text-left backdrop-blur-sm"
+              >
+                <card.icon size={16} className="mb-2 text-accent-primary" />
+                <p className="mb-1 text-xs font-medium text-text-primary">{card.title}</p>
+                <p className="text-[11px] leading-relaxed text-text-muted">{card.text}</p>
+              </div>
+            ))}
+          </div>
         </motion.div>
 
         {/* Footer */}

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#050c15"/>
+  <g transform="translate(256,256)">
+    <!-- Waveform lines -->
+    <line x1="-120" y1="0" x2="-100" y2="0" stroke="#4FA8D6" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+    <line x1="-80" y1="-40" x2="-80" y2="40" stroke="#4FA8D6" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-50" y1="-70" x2="-50" y2="70" stroke="#5ABF7B" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+    <line x1="-20" y1="-100" x2="-20" y2="100" stroke="#7B6DB5" stroke-width="6" stroke-linecap="round" opacity="0.8"/>
+    <line x1="10" y1="-120" x2="10" y2="120" stroke="#C77DBA" stroke-width="7" stroke-linecap="round"/>
+    <line x1="40" y1="-100" x2="40" y2="100" stroke="#7B6DB5" stroke-width="6" stroke-linecap="round" opacity="0.8"/>
+    <line x1="70" y1="-70" x2="70" y2="70" stroke="#5ABF7B" stroke-width="6" stroke-linecap="round" opacity="0.7"/>
+    <line x1="100" y1="-40" x2="100" y2="40" stroke="#4FA8D6" stroke-width="6" stroke-linecap="round" opacity="0.6"/>
+    <line x1="130" y1="0" x2="150" y2="0" stroke="#4FA8D6" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+  </g>
+</svg>
