@@ -5,29 +5,30 @@ import type { ChakraScore } from '@/lib/types';
 
 // ── Constants ──
 
-const MAX_WAVE_LINES = 12;
-const POINTS_PER_LINE = 128;
+const POINTS = 128;
 const IDLE_COLOR = '#4FA8D6';
-const COLOR_LERP_SPEED = 0.02; // ~2s full transition
+const COLOR_LERP_SPEED = 0.02;
+
+// Mode-specific config
+const CONFIG = {
+  idle:      { lines: 4,  maxAmp: 15, baseOpacity: 0.2,  glowSize: 4,  spread: 0.3 },
+  recording: { lines: 12, maxAmp: 70, baseOpacity: 0.5,  glowSize: 10, spread: 0.6 },
+  result:    { lines: 8,  maxAmp: 50, baseOpacity: 0.4,  glowSize: 6,  spread: 0.5 },
+} as const;
 
 // ── Props ──
 
 export interface VoiceWaveformProps {
-  // Real-time data from audio analysis
   timeDomainData: Float32Array | null;
-  rmsEnergy: number;           // 0-1
-  fundamental: number;         // Hz
-  overtoneRichness: number;    // 0-1
-  jitter: number;              // 0-1 normalised
-  shimmer: number;             // 0-1 normalised
-  chakraColor: string;         // Hex colour of dominant chakra
+  rmsEnergy: number;
+  fundamental: number;
+  overtoneRichness: number;
+  jitter: number;
+  shimmer: number;
+  chakraColor: string;
   chakraScores?: ChakraScore[];
-
-  // State
   isRecording: boolean;
   isResult: boolean;
-
-  // Layout
   height: number;
 }
 
@@ -43,23 +44,15 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 function rgbToHex(r: number, g: number, b: number): string {
-  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  return (
-    '#' +
-    clamp(r).toString(16).padStart(2, '0') +
-    clamp(g).toString(16).padStart(2, '0') +
-    clamp(b).toString(16).padStart(2, '0')
-  );
+  const cl = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  return '#' + cl(r).toString(16).padStart(2, '0') +
+    cl(g).toString(16).padStart(2, '0') + cl(b).toString(16).padStart(2, '0');
 }
 
 function lerpColor(a: string, b: string, t: number): string {
   const [rA, gA, bA] = hexToRgb(a);
   const [rB, gB, bB] = hexToRgb(b);
-  return rgbToHex(
-    rA + (rB - rA) * t,
-    gA + (gB - gA) * t,
-    bA + (bB - bA) * t,
-  );
+  return rgbToHex(rA + (rB - rA) * t, gA + (gB - gA) * t, bA + (bB - bA) * t);
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -90,121 +83,108 @@ function drawWaveform(
   width: number,
   height: number,
   time: number,
-  currentColor: string,
+  color: string,
   props: VoiceWaveformProps,
-  multiColorActive: boolean,
+  multiColor: boolean,
 ) {
-  const {
-    timeDomainData,
-    rmsEnergy,
-    fundamental,
-    overtoneRichness,
-    jitter,
-    shimmer,
-    isRecording,
-    isResult,
-    chakraScores,
-  } = props;
+  const { timeDomainData, rmsEnergy, isRecording, isResult, chakraScores } = props;
 
   ctx.clearRect(0, 0, width, height);
 
-  // How many lines based on overtone richness (4-12)
-  const visibleLines = isRecording || isResult
-    ? Math.round(4 + overtoneRichness * 8)
-    : 6; // idle: moderate line count
-
+  const mode = isRecording ? 'recording' : isResult ? 'result' : 'idle';
+  const c = CONFIG[mode];
   const centerY = height / 2;
 
-  // Amplitude: scale with RMS energy during recording
-  const amplitudeFactor = isRecording
-    ? Math.max(0.15, rmsEnergy * 3)
-    : isResult
-      ? 0.35
-      : 0.2; // idle: gentle
-  const maxAmplitude = (height / 2) * 0.8 * amplitudeFactor;
+  // Scale amplitude with actual loudness during recording
+  const ampScale = mode === 'recording' ? Math.max(0.3, rmsEnergy * 4) : 0.5;
 
-  // Jitter → wobble amount (live recording only)
-  const jitterOffset = isRecording ? jitter * 5 : 0;
+  for (let line = 0; line < c.lines; line++) {
+    // lineT: 0 to 1 spread evenly across THIS mode's line count
+    const lineT = c.lines > 1 ? line / (c.lines - 1) : 0.5;
 
-  for (let line = 0; line < visibleLines; line++) {
-    const lineProgress = line / (MAX_WAVE_LINES - 1); // 0-1 across the full 12
+    // Vertical offset — spread lines across the height
+    const verticalOffset = (lineT - 0.5) * height * c.spread;
 
-    // Base opacity: brighter in the centre of the ribbon
-    const centreDistance = Math.abs(lineProgress - 0.5) * 2; // 0 at centre, 1 at edges
-    const lineOpacity = 0.15 + (1 - centreDistance) * 0.55;
+    // Phase offset — each line slightly shifted in time
+    const phase = lineT * Math.PI * 0.8;
 
-    // Shimmer: per-line opacity modulation
-    const shimmerVar = shimmer * 0.2 * Math.sin(time * 2 + line * 0.7);
-    const finalOpacity = Math.max(0.1, lineOpacity + shimmerVar);
+    // Opacity — center lines brighter, outer lines dimmer
+    const distFromCenter = Math.abs(lineT - 0.5) * 2; // 0 at center, 1 at edges
+    const opacity = c.baseOpacity * (1 - distFromCenter * 0.6);
 
-    // Phase offset per line (creates the ribbon spread)
-    const phaseOffset = (lineProgress - 0.5) * Math.PI * 0.6;
-
-    // Vertical offset per line (creates depth)
-    const yOffset = (lineProgress - 0.5) * maxAmplitude * 0.4;
+    // Amplitude variation per line — center lines taller
+    const lineAmpScale = 1 - distFromCenter * 0.4;
 
     // Determine colour for this line
-    let lineColor = currentColor;
-    if (multiColorActive && chakraScores && chakraScores.length >= 2) {
-      lineColor = getLineColor(line, visibleLines, chakraScores, currentColor);
+    let lineColor = color;
+    if (multiColor && chakraScores && chakraScores.length >= 2) {
+      lineColor = getLineColor(line, c.lines, chakraScores, color);
     }
 
-    // Start path
-    ctx.beginPath();
-    ctx.strokeStyle = hexToRgba(lineColor, finalOpacity);
-    ctx.lineWidth = 1.5;
-    ctx.shadowColor = lineColor;
-    ctx.shadowBlur = 4 + (isRecording ? rmsEnergy * 8 : 2);
+    // Glow: result mode pulses gently, recording scales with RMS
+    let glowSize = c.glowSize * (1 - distFromCenter * 0.5);
+    if (mode === 'result') {
+      glowSize = 4 + Math.sin(time * 0.8) * 2; // pulse 4-8px
+    } else if (mode === 'recording') {
+      glowSize += rmsEnergy * 6;
+    }
 
+    ctx.beginPath();
+    ctx.strokeStyle = hexToRgba(lineColor, opacity);
+    ctx.lineWidth = 1.8;
+    ctx.shadowColor = lineColor;
+    ctx.shadowBlur = glowSize;
+
+    let prevX = 0;
     let prevY = centerY;
 
-    for (let i = 0; i <= POINTS_PER_LINE; i++) {
-      const x = (i / POINTS_PER_LINE) * width;
-      const progress = i / POINTS_PER_LINE;
+    for (let i = 0; i <= POINTS; i++) {
+      const x = (i / POINTS) * width;
+      const t = i / POINTS;
 
-      let y = centerY + yOffset;
+      // Envelope — fade at horizontal edges
+      const envelope = Math.sin(t * Math.PI);
 
-      if (timeDomainData && timeDomainData.length > 0) {
-        // Use real waveform data (live recording or frozen result)
-        const dataIndex = Math.floor(progress * timeDomainData.length);
-        const sample = timeDomainData[dataIndex] || 0;
-        y += sample * maxAmplitude * (1 + lineProgress * 0.3);
-      } else {
-        // Idle: gentle breathing sine (no audio data)
-        y += Math.sin(progress * Math.PI * 4 + time * 0.5 + phaseOffset) * maxAmplitude * 0.3;
+      let displacement = 0;
+
+      if (timeDomainData && timeDomainData.length > 0 && mode !== 'idle') {
+        // Use real audio data
+        const dataIdx = Math.floor(t * timeDomainData.length);
+        const sample = timeDomainData[Math.min(dataIdx, timeDomainData.length - 1)] || 0;
+        displacement = sample * c.maxAmp * ampScale * lineAmpScale;
       }
 
-      if (!isResult) {
-        // Flowing animation overlay (live + idle only, not result)
-        y += Math.sin(progress * Math.PI * 2 + time * 1.5 + phaseOffset) * 8;
+      // Add flowing animation (idle + recording, not result)
+      if (mode !== 'result') {
+        displacement += Math.sin(t * Math.PI * 3 + time * 1.2 + phase) * c.maxAmp * 0.15;
       }
 
-      // Jitter wobble (live only)
-      if (jitterOffset > 0) {
-        y += Math.sin(progress * 20 + time * 3 + line) * jitterOffset;
+      // Idle mode: pure sine waves
+      if (mode === 'idle') {
+        displacement = Math.sin(t * Math.PI * 2 + time * 0.4 + phase) * c.maxAmp * 0.8;
       }
 
-      // Envelope: fade amplitude at horizontal edges
-      const envelope = Math.sin(progress * Math.PI);
-      y = centerY + yOffset + (y - centerY - yOffset) * envelope;
+      // Apply envelope
+      displacement *= envelope;
+
+      const y = centerY + verticalOffset + displacement;
 
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
-        // Quadratic curve for smoothness
-        const prevX = ((i - 1) / POINTS_PER_LINE) * width;
+        // Smooth quadratic curve
         const cpX = (prevX + x) / 2;
         const cpY = (prevY + y) / 2;
         ctx.quadraticCurveTo(prevX, prevY, cpX, cpY);
       }
 
+      prevX = x;
       prevY = y;
     }
 
     ctx.stroke();
   }
 
-  // Reset shadow
   ctx.shadowBlur = 0;
 }
 
@@ -217,93 +197,72 @@ export function VoiceWaveform(props: VoiceWaveformProps) {
   const currentColorRef = useRef<string>(IDLE_COLOR);
   const containerRef = useRef<HTMLDivElement>(null);
   const widthRef = useRef<number>(420);
-
-  // Track the elapsed recording time to know when multi-colour kicks in
   const recordingStartRef = useRef<number>(0);
 
-  // Update recording start time
   useEffect(() => {
     if (props.isRecording) {
       recordingStartRef.current = performance.now();
     }
   }, [props.isRecording]);
 
-  // Memoize the draw callback to avoid re-creating on every render
-  // We use refs to access latest props without triggering effect re-runs
   const propsRef = useRef(props);
   propsRef.current = props;
 
   const animate = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     const p = propsRef.current;
     const time = (performance.now() - startTimeRef.current) / 1000;
 
-    // Colour: immediate for result screen, smooth lerp for live/idle
+    // Colour: immediate for result, smooth lerp for live/idle
     if (p.isResult) {
       currentColorRef.current = p.chakraColor;
     } else {
-      const targetColor = p.isRecording ? p.chakraColor : IDLE_COLOR;
-      currentColorRef.current = lerpColor(
-        currentColorRef.current,
-        targetColor,
-        COLOR_LERP_SPEED,
-      );
+      const target = p.isRecording ? p.chakraColor : IDLE_COLOR;
+      currentColorRef.current = lerpColor(currentColorRef.current, target, COLOR_LERP_SPEED);
     }
 
     // Multi-colour ribbon: after 5s of recording, or always on result
-    const recordingSecs = p.isRecording
+    const recSecs = p.isRecording
       ? (performance.now() - recordingStartRef.current) / 1000
       : 0;
-    const multiColorActive = p.isResult || (p.isRecording && recordingSecs > 5);
+    const multiColor = p.isResult || (p.isRecording && recSecs > 5);
 
-    // Get actual canvas CSS width
-    const w = widthRef.current;
-
-    drawWaveform(ctx, w, p.height, time, currentColorRef.current, p, multiColorActive);
-
-    // Result screen: render once then stop (frozen voice signature)
-    if (p.isResult) return;
+    drawWaveform(ctx, widthRef.current, p.height, time, currentColorRef.current, p, multiColor);
 
     animationRef.current = requestAnimationFrame(animate);
   }, []);
 
-  // Set up canvas sizing and animation loop
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    // ResizeObserver for responsive width
+    const setupSize = (w: number, h: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
+    };
+
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const w = entry.contentRect.width;
         if (w > 0) {
           widthRef.current = w;
-          const dpr = window.devicePixelRatio || 1;
-          canvas.width = w * dpr;
-          canvas.height = props.height * dpr;
-          const ctx = canvas.getContext('2d');
-          if (ctx) ctx.scale(dpr, dpr);
+          setupSize(w, propsRef.current.height);
         }
       }
     });
     observer.observe(container);
 
-    // Initial sizing
-    const w = container.clientWidth || 420;
-    widthRef.current = w;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = w * dpr;
-    canvas.height = props.height * dpr;
-    const ctx = canvas.getContext('2d');
-    if (ctx) ctx.scale(dpr, dpr);
+    widthRef.current = container.clientWidth || 420;
+    setupSize(widthRef.current, props.height);
 
-    // Start animation loop
     animationRef.current = requestAnimationFrame(animate);
 
     return () => {
@@ -316,11 +275,7 @@ export function VoiceWaveform(props: VoiceWaveformProps) {
     <div ref={containerRef} className="w-full">
       <canvas
         ref={canvasRef}
-        style={{
-          width: '100%',
-          height: props.height,
-          display: 'block',
-        }}
+        style={{ width: '100%', height: props.height, display: 'block' }}
       />
     </div>
   );

@@ -73,7 +73,7 @@ export function IdleScreen({ onStart, error }: IdleScreenProps) {
             chakraColor="#4FA8D6"
             isRecording={false}
             isResult={false}
-            height={120}
+            height={80}
           />
         </motion.div>
 

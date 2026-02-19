@@ -82,7 +82,7 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
           chakraScores={data.chakraScores}
           isRecording={true}
           isResult={false}
-          height={220}
+          height={200}
         />
 
         {/* Mandala with live chakra dots */}

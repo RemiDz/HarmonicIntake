@@ -88,7 +88,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
             chakraScores={profile.chakraScores}
             isRecording={false}
             isResult={true}
-            height={150}
+            height={120}
           />
         </motion.div>
 

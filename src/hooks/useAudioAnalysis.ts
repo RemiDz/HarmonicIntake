@@ -139,8 +139,9 @@ export function useAudioAnalysis() {
     const recentReadings = readingsRef.current.slice(-STABILITY_WINDOW);
     const stability = calculateStability(recentReadings);
 
-    // Capture a frozen waveform snapshot during the stable middle phase
-    if (!frozenWaveformRef.current && hz > 0 && elapsed > 5 && stability > 0.3 && rms > 0.01) {
+    // Always capture the latest waveform frame with valid pitch.
+    // The last captured frame becomes the frozen "voice signature".
+    if (hz > 0 && rms > 0.01) {
       frozenWaveformRef.current = new Float32Array(timeDomain);
     }
 
