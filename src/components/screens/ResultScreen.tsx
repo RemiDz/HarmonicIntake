@@ -11,6 +11,7 @@ import { ChakraBarChart } from '@/components/viz/ChakraBarChart';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { CountingNumber } from '@/components/ui/CountingNumber';
 import { generateHTMLReport } from '@/lib/share/generate-report';
 import { generateShareCard } from '@/lib/share/generate-card';
 import { formatHumanEmailSubject, formatHumanEmailBody } from '@/lib/profile/humanize';
@@ -33,12 +34,12 @@ interface ResultScreenProps {
 
 const stagger = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.08 } },
+  visible: { transition: { staggerChildren: 0.1 } },
 };
 
 const fadeInUp = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
 export function ResultScreen({ profile, onReset }: ResultScreenProps) {
@@ -106,14 +107,14 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           />
         </motion.div>
 
-        {/* 3-column metrics */}
+        {/* 3-column metrics with counting numbers */}
         <motion.div variants={fadeInUp}>
           <Card className="p-4">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
                 <p className="text-[10px] tracking-wider text-text-dim uppercase">Fundamental</p>
                 <p className="mt-1 font-mono text-lg font-medium text-text-primary">
-                  {profile.fundamental}
+                  <CountingNumber value={profile.fundamental} decimals={1} duration={1000} />
                 </p>
                 <p className="text-[10px] text-text-muted">Hz</p>
               </div>
@@ -131,7 +132,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
               <div>
                 <p className="text-[10px] tracking-wider text-text-dim uppercase">Stability</p>
                 <p className="mt-1 font-mono text-lg font-medium text-text-primary">
-                  {stabilityPct}%
+                  <CountingNumber value={stabilityPct} suffix="%" duration={1000} />
                 </p>
                 <p className="text-[10px] text-text-muted">
                   {getStabilityLabel(profile.stability)}
@@ -224,7 +225,8 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
                 <p className="text-sm font-medium text-text-primary">
                   {profile.dominantChakra.name} Chakra
                   <span className="ml-2 font-mono text-xs text-text-muted">
-                    {profile.dominantChakra.score}% {profile.dominantChakra.label}
+                    <CountingNumber value={profile.dominantChakra.score} suffix="%" duration={800} />{' '}
+                    {profile.dominantChakra.label}
                   </span>
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-text-secondary">
@@ -280,7 +282,9 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
               </div>
               <div className="rounded-xl bg-bg-mid p-3">
                 <p className="text-[10px] text-text-dim">Overtone Richness</p>
-                <p className="mt-0.5 font-mono text-sm text-text-primary">{profile.richness}%</p>
+                <p className="mt-0.5 font-mono text-sm text-text-primary">
+                  <CountingNumber value={profile.richness} suffix="%" duration={800} />
+                </p>
                 <p className="text-[10px] text-text-muted">{getRichnessLabel(profile.richness)}</p>
               </div>
               <div className="rounded-xl bg-bg-mid p-3">
