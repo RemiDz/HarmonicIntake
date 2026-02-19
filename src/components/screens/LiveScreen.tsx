@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import type { RealTimeData } from '@/lib/types';
+import { VoiceWaveform } from '@/components/viz/VoiceWaveform';
 import { MandalaViz } from '@/components/viz/MandalaViz';
 import { SpectrumBar } from '@/components/viz/SpectrumBar';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
@@ -67,6 +68,23 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
           </div>
         </div>
 
+        {/* Voice Waveform — hero visual */}
+        <VoiceWaveform
+          timeDomainData={data.timeDomainData}
+          rmsEnergy={data.rmsEnergy}
+          fundamental={data.currentHz}
+          overtoneRichness={data.overtones.length > 0
+            ? data.overtones.reduce((sum, o) => sum + o.amplitude, 0) / data.overtones.length
+            : 0}
+          jitter={Math.min(data.liveJitterRelative / 2, 1)}
+          shimmer={0}
+          chakraColor={data.currentChakra?.color || '#4FA8D6'}
+          chakraScores={data.chakraScores}
+          isRecording={true}
+          isResult={false}
+          height={220}
+        />
+
         {/* Mandala with live chakra dots */}
         <div className="relative">
           <MandalaViz
@@ -128,9 +146,35 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
           <OvertoneChart overtones={data.overtones} />
         </Card>
 
-        {/* Stability */}
+        {/* Stability + Live Biomarkers */}
         <Card className="p-4">
           <StabilityMeter value={data.stability} />
+          {(data.liveHnr > 0 || data.liveJitterRelative > 0) && (
+            <div className="mt-3 flex gap-4 border-t border-border pt-3">
+              {data.liveHnr > 0 && (
+                <div className="flex-1 text-center">
+                  <p className="text-[10px] text-text-dim">Clarity</p>
+                  <p className="mt-0.5 font-mono text-sm text-text-primary">
+                    {data.liveHnr} dB
+                  </p>
+                  <p className="text-[10px] text-text-muted">
+                    {data.liveHnr >= 28 ? 'Clear' : data.liveHnr >= 20 ? 'Warm' : 'Soft'}
+                  </p>
+                </div>
+              )}
+              {data.liveJitterRelative > 0 && (
+                <div className="flex-1 text-center">
+                  <p className="text-[10px] text-text-dim">Steadiness</p>
+                  <p className="mt-0.5 font-mono text-sm text-text-primary">
+                    {data.liveJitterRelative}%
+                  </p>
+                  <p className="text-[10px] text-text-muted">
+                    {data.liveJitterRelative < 0.5 ? 'Calm' : data.liveJitterRelative < 1.0 ? 'Natural' : 'Fluid'}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* End early */}

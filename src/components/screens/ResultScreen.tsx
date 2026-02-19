@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { RotateCcw, Sparkles } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
+import { VoiceWaveform } from '@/components/viz/VoiceWaveform';
 import { MandalaViz } from '@/components/viz/MandalaViz';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
 import { ChakraBodyMap } from '@/components/viz/ChakraBodyMap';
@@ -17,6 +18,12 @@ import {
   getRichnessLabel,
   getInstrumentSuggestion,
 } from '@/lib/profile/recommendations';
+import {
+  getJitterDescription,
+  getShimmerDescription,
+  getHnrDescription,
+  getPitchRangeDescription,
+} from '@/lib/profile/humanize';
 
 interface ResultScreenProps {
   profile: FrequencyProfile;
@@ -35,6 +42,7 @@ const fadeInUp = {
 
 export function ResultScreen({ profile, onReset }: ResultScreenProps) {
   const stabilityPct = Math.round(profile.stability * 100);
+  const vp = profile.voiceProfile;
 
   return (
     <motion.div
@@ -65,6 +73,23 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
               minute: '2-digit',
             })}
           </p>
+        </motion.div>
+
+        {/* Voice Signature waveform (static) */}
+        <motion.div variants={fadeInUp}>
+          <VoiceWaveform
+            timeDomainData={null}
+            rmsEnergy={profile.voiceProfile.rmsEnergy}
+            fundamental={profile.fundamental}
+            overtoneRichness={profile.richness / 100}
+            jitter={Math.min(profile.voiceProfile.jitter.relative / 2, 1)}
+            shimmer={Math.min(profile.voiceProfile.shimmer.relative / 100, 1)}
+            chakraColor={profile.dominantChakra.color}
+            chakraScores={profile.chakraScores}
+            isRecording={false}
+            isResult={true}
+            height={150}
+          />
         </motion.div>
 
         {/* Mandala (static) */}
@@ -106,6 +131,65 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
                 </p>
                 <p className="text-[10px] text-text-muted">
                   {getStabilityLabel(profile.stability)}
+                </p>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Voice Quality Insights */}
+        <motion.div variants={fadeInUp}>
+          <Card className="p-4">
+            <p className="mb-3 text-[10px] tracking-wider text-text-dim uppercase">
+              Voice Qualities
+            </p>
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-text-dim">Vocal Steadiness</p>
+                  <p className="font-mono text-[10px] text-text-muted">
+                    {vp.jitter.relative < 0.5 ? 'Calm' : vp.jitter.relative < 1.0 ? 'Natural' : 'Fluid'}
+                  </p>
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                  {getJitterDescription(vp.jitter.relative)}
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-text-dim">Projection</p>
+                  <p className="font-mono text-[10px] text-text-muted">
+                    {vp.shimmer.db < 0.2 ? 'Strong' : vp.shimmer.db < 0.4 ? 'Gentle' : 'Soft'}
+                  </p>
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                  {getShimmerDescription(vp.shimmer.db)}
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-text-dim">Clarity</p>
+                  <p className="font-mono text-[10px] text-text-muted">
+                    {vp.hnr >= 28 ? 'Clear' : vp.hnr >= 20 ? 'Warm' : 'Soft'}
+                  </p>
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                  {getHnrDescription(vp.hnr)}
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] text-text-dim">Expressiveness</p>
+                  <p className="font-mono text-[10px] text-text-muted">
+                    {vp.pitchRange.rangeSemitones >= 6
+                      ? 'Dynamic'
+                      : vp.pitchRange.rangeSemitones >= 3
+                        ? 'Balanced'
+                        : 'Focused'}
+                  </p>
+                </div>
+                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                  {getPitchRangeDescription(vp.pitchRange.rangeSemitones)}
                 </p>
               </div>
             </div>
@@ -238,6 +322,16 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
             New Analysis
           </Button>
         </motion.div>
+
+        {/* Disclaimer */}
+        <motion.p
+          variants={fadeInUp}
+          className="px-4 text-center text-[9px] leading-relaxed text-text-dim"
+        >
+          This analysis explores the acoustic qualities of your voice through a wellness lens. It is
+          not a medical, diagnostic, or clinical assessment. For voice health concerns, please
+          consult a qualified healthcare professional.
+        </motion.p>
 
         {/* Footer */}
         <motion.p

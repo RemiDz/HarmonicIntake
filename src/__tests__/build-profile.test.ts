@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildProfile, calculateStability } from '@/lib/profile/build-profile';
-import type { Overtone, VocalQualities } from '@/lib/types';
+import type { Overtone } from '@/lib/types';
 
 describe('calculateStability', () => {
   it('returns high stability for consistent readings', () => {
@@ -34,15 +34,6 @@ describe('calculateStability', () => {
   });
 });
 
-const mockVocalQualities: VocalQualities = {
-  rmsEnergy: 0.5,
-  stability: 0.9,
-  spectralCentroid: 300,
-  spectralSpread: 100,
-  harmonicToNoise: 0.6,
-  dynamicRange: 0.3,
-};
-
 describe('buildProfile', () => {
   const mockOvertones: Overtone[] = [
     { harmonic: 2, freq: 880, amplitude: 0.5, db: -6 },
@@ -62,7 +53,8 @@ describe('buildProfile', () => {
       readings,
       overtoneSnapshots: snapshots,
       frequencyDataSnapshots: [],
-      vocalQualities: mockVocalQualities,
+      allCycles: [],
+      rmsHistory: Array(60).fill(0.05),
       sampleRate: 44100,
       fftSize: 4096,
     });
@@ -77,7 +69,8 @@ describe('buildProfile', () => {
     expect(profile.fifth.freq).toBeCloseTo(660, 0);
     expect(profile.third.freq).toBeCloseTo(528, 0);
     expect(profile.timestamp).toBeInstanceOf(Date);
-    expect(profile.vocalQualities).toEqual(mockVocalQualities);
+    expect(profile.voiceProfile).toBeDefined();
+    expect(profile.voiceProfile.fundamental.mean).toBe(440);
     expect(profile.dominantChakra).toBeDefined();
   });
 
@@ -89,7 +82,8 @@ describe('buildProfile', () => {
       readings,
       overtoneSnapshots: snapshots,
       frequencyDataSnapshots: [],
-      vocalQualities: mockVocalQualities,
+      allCycles: [],
+      rmsHistory: [0.05, 0, 0.05, 0, 0.05],
       sampleRate: 44100,
       fftSize: 4096,
     });
@@ -104,12 +98,43 @@ describe('buildProfile', () => {
       readings,
       overtoneSnapshots: [],
       frequencyDataSnapshots: [],
-      vocalQualities: mockVocalQualities,
+      allCycles: [],
+      rmsHistory: [0, 0, 0],
       sampleRate: 44100,
       fftSize: 4096,
     });
 
     expect(profile.fundamental).toBe(0);
     expect(profile.stability).toBe(0);
+  });
+
+  it('produces voice profile with biomarkers from glottal cycles', () => {
+    const readings = Array(60).fill(130); // male-like fundamental
+    const snapshots = Array(60).fill(mockOvertones);
+
+    // Simulate glottal cycles at ~130 Hz (period ~0.00769s at 44100 Hz)
+    const period = 1 / 130;
+    const cycles = Array(100)
+      .fill(null)
+      .map((_, i) => ({
+        periodSamples: Math.round(44100 / 130) + (i % 3 === 0 ? 1 : 0), // slight variation
+        periodSeconds: period + (i % 3 === 0 ? 0.00002 : 0),
+        peakAmplitude: 0.1 + (i % 5 === 0 ? 0.01 : 0),
+      }));
+
+    const profile = buildProfile({
+      readings,
+      overtoneSnapshots: snapshots,
+      frequencyDataSnapshots: [],
+      allCycles: cycles,
+      rmsHistory: Array(60).fill(0.08),
+      sampleRate: 44100,
+      fftSize: 4096,
+    });
+
+    expect(profile.voiceProfile.jitter.relative).toBeGreaterThan(0);
+    expect(profile.voiceProfile.shimmer.db).toBeGreaterThan(0);
+    expect(profile.voiceProfile.cycleCount).toBe(100);
+    expect(profile.voiceProfile.fundamental.mean).toBe(130);
   });
 });

@@ -1,17 +1,20 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import type { AppScreen, FrequencyProfile, RealTimeData, Overtone, ChakraScore } from '@/lib/types';
+import type { AppScreen, FrequencyProfile, RealTimeData, Overtone } from '@/lib/types';
 import { detectPitch } from '@/lib/audio/pitch-detection';
 import { extractOvertones } from '@/lib/audio/overtone-analysis';
 import { extractSpectrum } from '@/lib/audio/spectrum';
+import { extractGlottalCycles, type GlottalCycle } from '@/lib/audio/glottal-cycles';
+import { calculateJitter } from '@/lib/audio/jitter';
+import { calculateHNR } from '@/lib/audio/hnr';
 import { frequencyToNote } from '@/lib/music/note-mapping';
 import { frequencyToChakra } from '@/lib/music/chakra-mapping';
 import { calculateStability } from '@/lib/profile/build-profile';
 import { buildProfile } from '@/lib/profile/build-profile';
 import { startRecording, type AudioRecorderHandle } from '@/lib/audio/recorder';
-import { extractFrameQualities, averageVocalQualities } from '@/lib/audio/vocal-qualities';
-import { calculateLiveChakraScores } from '@/lib/audio/chakra-analysis';
+import { getRMSEnergy } from '@/lib/audio/vocal-qualities';
+import { calculateLiveChakraScores } from '@/lib/scoring/chakra-scoring';
 
 const RECORDING_DURATION = 15;
 const STABILITY_WINDOW = 30;
@@ -25,6 +28,10 @@ const EMPTY_REALTIME: RealTimeData = {
   spectrumData: [],
   elapsed: 0,
   chakraScores: [],
+  liveHnr: 0,
+  liveJitterRelative: 0,
+  timeDomainData: null,
+  rmsEnergy: 0,
 };
 
 export function useAudioAnalysis() {
@@ -39,9 +46,7 @@ export function useAudioAnalysis() {
   const readingsRef = useRef<number[]>([]);
   const overtoneSnapshotsRef = useRef<Overtone[][]>([]);
   const frequencyDataSnapshotsRef = useRef<Float32Array[]>([]);
-  const vocalFramesRef = useRef<
-    { rmsEnergy: number; spectralCentroid: number; spectralSpread: number; harmonicToNoise: number }[]
-  >([]);
+  const allCyclesRef = useRef<GlottalCycle[]>([]);
   const rmsHistoryRef = useRef<number[]>([]);
 
   const cleanup = useCallback(() => {
@@ -52,29 +57,23 @@ export function useAudioAnalysis() {
     }
   }, []);
 
-  const finishRecording = useCallback(() => {
-    cleanup();
+  const doFinish = useCallback(
+    (sampleRate: number, fftSize: number) => {
+      const result = buildProfile({
+        readings: readingsRef.current,
+        overtoneSnapshots: overtoneSnapshotsRef.current,
+        frequencyDataSnapshots: frequencyDataSnapshotsRef.current,
+        allCycles: allCyclesRef.current,
+        rmsHistory: rmsHistoryRef.current,
+        sampleRate,
+        fftSize,
+      });
 
-    const stability = calculateStability(readingsRef.current);
-    const vocalQualities = averageVocalQualities(
-      vocalFramesRef.current,
-      stability,
-      rmsHistoryRef.current,
-    );
-
-    const recorder = recorderRef.current;
-    const result = buildProfile({
-      readings: readingsRef.current,
-      overtoneSnapshots: overtoneSnapshotsRef.current,
-      frequencyDataSnapshots: frequencyDataSnapshotsRef.current,
-      vocalQualities,
-      sampleRate: recorder?.sampleRate || 44100,
-      fftSize: recorder?.analyser.fftSize || 4096,
-    });
-
-    setProfile(result);
-    setScreen('complete');
-  }, [cleanup]);
+      setProfile(result);
+      setScreen('complete');
+    },
+    [],
+  );
 
   const analysisLoop = useCallback(() => {
     const recorder = recorderRef.current;
@@ -83,30 +82,10 @@ export function useAudioAnalysis() {
     const elapsed = (performance.now() - startTimeRef.current) / 1000;
 
     if (elapsed >= RECORDING_DURATION) {
-      // Store recorder info before cleanup
       const sampleRate = recorder.sampleRate;
       const fftSize = recorder.analyser.fftSize;
-
       cleanup();
-
-      const stability = calculateStability(readingsRef.current);
-      const vocalQualities = averageVocalQualities(
-        vocalFramesRef.current,
-        stability,
-        rmsHistoryRef.current,
-      );
-
-      const result = buildProfile({
-        readings: readingsRef.current,
-        overtoneSnapshots: overtoneSnapshotsRef.current,
-        frequencyDataSnapshots: frequencyDataSnapshotsRef.current,
-        vocalQualities,
-        sampleRate,
-        fftSize,
-      });
-
-      setProfile(result);
-      setScreen('complete');
+      doFinish(sampleRate, fftSize);
       return;
     }
 
@@ -118,27 +97,38 @@ export function useAudioAnalysis() {
     const hz = detectPitch(timeDomain, recorder.sampleRate);
     readingsRef.current.push(hz);
 
-    // Store frequency data snapshot (copy it since the buffer is reused)
+    // Store frequency data snapshot (copy since the buffer is reused)
     const freqCopy = new Float32Array(freqDomain);
     frequencyDataSnapshotsRef.current.push(freqCopy);
 
-    // Overtones (only if we have a valid pitch)
+    // RMS energy
+    const rms = getRMSEnergy(timeDomain);
+    rmsHistoryRef.current.push(rms);
+
+    // Overtones and glottal cycles (only if we have a valid pitch)
     let overtones: Overtone[] = [];
+    let liveHnr = 0;
+    let liveJitterRelative = 0;
+
     if (hz > 0) {
       overtones = extractOvertones(freqDomain, hz, recorder.sampleRate, recorder.analyser.fftSize);
       overtoneSnapshotsRef.current.push(overtones);
-    }
 
-    // Vocal qualities per frame
-    const frameQualities = extractFrameQualities(
-      timeDomain,
-      freqDomain,
-      hz,
-      recorder.sampleRate,
-      recorder.analyser.fftSize,
-    );
-    vocalFramesRef.current.push(frameQualities);
-    rmsHistoryRef.current.push(frameQualities.rmsEnergy);
+      // Extract glottal cycles for jitter/shimmer
+      const cycles = extractGlottalCycles(timeDomain, recorder.sampleRate, hz);
+      allCyclesRef.current.push(...cycles);
+
+      // Live HNR
+      liveHnr = calculateHNR(freqDomain, hz, recorder.sampleRate, recorder.analyser.fftSize);
+
+      // Live jitter from accumulated cycles (becomes more accurate over time)
+      if (allCyclesRef.current.length >= 3) {
+        const recentCycles = allCyclesRef.current.slice(-50);
+        const periods = recentCycles.map((c) => c.periodSeconds);
+        const jitterResult = calculateJitter(periods);
+        liveJitterRelative = jitterResult.relative;
+      }
+    }
 
     // Spectrum
     const spectrumData = extractSpectrum(freqDomain, recorder.analyser.fftSize);
@@ -163,10 +153,14 @@ export function useAudioAnalysis() {
       spectrumData,
       elapsed,
       chakraScores,
+      liveHnr: Math.round(liveHnr * 10) / 10,
+      liveJitterRelative: Math.round(liveJitterRelative * 100) / 100,
+      timeDomainData: new Float32Array(timeDomain),
+      rmsEnergy: rms,
     });
 
     rafRef.current = requestAnimationFrame(analysisLoop);
-  }, [cleanup]);
+  }, [cleanup, doFinish]);
 
   const beginRecording = useCallback(async () => {
     try {
@@ -174,7 +168,7 @@ export function useAudioAnalysis() {
       readingsRef.current = [];
       overtoneSnapshotsRef.current = [];
       frequencyDataSnapshotsRef.current = [];
-      vocalFramesRef.current = [];
+      allCyclesRef.current = [];
       rmsHistoryRef.current = [];
 
       const recorder = await startRecording();
@@ -206,28 +200,9 @@ export function useAudioAnalysis() {
     const recorder = recorderRef.current;
     const sampleRate = recorder?.sampleRate || 44100;
     const fftSize = recorder?.analyser.fftSize || 4096;
-
     cleanup();
-
-    const stability = calculateStability(readingsRef.current);
-    const vocalQualities = averageVocalQualities(
-      vocalFramesRef.current,
-      stability,
-      rmsHistoryRef.current,
-    );
-
-    const result = buildProfile({
-      readings: readingsRef.current,
-      overtoneSnapshots: overtoneSnapshotsRef.current,
-      frequencyDataSnapshots: frequencyDataSnapshotsRef.current,
-      vocalQualities,
-      sampleRate,
-      fftSize,
-    });
-
-    setProfile(result);
-    setScreen('complete');
-  }, [cleanup]);
+    doFinish(sampleRate, fftSize);
+  }, [cleanup, doFinish]);
 
   const reset = useCallback(() => {
     cleanup();

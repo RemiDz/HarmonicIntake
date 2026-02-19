@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mic } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { VoiceWaveform } from '@/components/viz/VoiceWaveform';
 
 interface IdleScreenProps {
   onStart: () => void;
@@ -59,6 +60,22 @@ export function IdleScreen({ onStart, error }: IdleScreenProps) {
         <motion.p variants={fadeInUp} className="text-sm text-text-secondary">
           Real-time vocal frequency analysis for practitioners
         </motion.p>
+
+        {/* Ambient waveform */}
+        <motion.div variants={fadeInUp}>
+          <VoiceWaveform
+            timeDomainData={null}
+            rmsEnergy={0}
+            fundamental={0}
+            overtoneRichness={0}
+            jitter={0}
+            shimmer={0}
+            chakraColor="#4FA8D6"
+            isRecording={false}
+            isResult={false}
+            height={120}
+          />
+        </motion.div>
 
         {/* Steps card */}
         <motion.div variants={fadeInUp}>

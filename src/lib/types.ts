@@ -21,15 +21,6 @@ export interface ChakraScore {
   description: string;
 }
 
-export interface VocalQualities {
-  rmsEnergy: number;
-  stability: number;
-  spectralCentroid: number;
-  spectralSpread: number;
-  harmonicToNoise: number;
-  dynamicRange: number;
-}
-
 export interface Overtone {
   harmonic: number;
   freq: number;
@@ -40,6 +31,42 @@ export interface Overtone {
 export interface IntervalInfo {
   freq: number;
   note: NoteInfo;
+}
+
+// ── Voice Biomarker Types (V2 Engine) ──
+
+export interface VoiceProfile {
+  fundamental: {
+    mean: number;
+    stdDev: number;
+    min: number;
+    max: number;
+  };
+  jitter: {
+    absolute: number;   // seconds
+    relative: number;   // percentage
+    rap: number;         // relative average perturbation %
+  };
+  shimmer: {
+    db: number;          // dB
+    relative: number;    // percentage
+    apq3: number;        // 3-point amplitude perturbation %
+  };
+  hnr: number;           // dB
+  formants: {
+    f1: number;          // Hz
+    f2: number;          // Hz
+    f3: number;          // Hz
+  };
+  spectralCentroid: number; // Hz
+  spectralSlope: number;    // dB/Hz
+  rmsEnergy: number;        // 0-1
+  dynamicRange: number;     // 0-1
+  pitchRange: {
+    rangeSemitones: number;
+    rangeHz: number;
+  };
+  cycleCount: number;
 }
 
 export interface FrequencyProfile {
@@ -53,7 +80,7 @@ export interface FrequencyProfile {
   third: IntervalInfo;
   timestamp: Date;
   chakraScores: ChakraScore[];
-  vocalQualities: VocalQualities;
+  voiceProfile: VoiceProfile;
   dominantChakra: ChakraScore;
 }
 
@@ -68,4 +95,8 @@ export interface RealTimeData {
   spectrumData: number[];
   elapsed: number;
   chakraScores: ChakraScore[];
+  liveHnr: number;
+  liveJitterRelative: number;
+  timeDomainData: Float32Array | null;
+  rmsEnergy: number;
 }
