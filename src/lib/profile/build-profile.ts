@@ -142,6 +142,7 @@ export interface RecordingData {
   rmsHistory: number[];
   sampleRate: number;
   fftSize: number;
+  frozenWaveform: Float32Array | null;
 }
 
 /**
@@ -252,5 +253,6 @@ export function buildProfile(data: RecordingData): FrequencyProfile {
     chakraScores,
     voiceProfile,
     dominantChakra,
+    frozenWaveform: data.frozenWaveform,
   };
 }

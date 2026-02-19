@@ -82,6 +82,7 @@ export interface FrequencyProfile {
   chakraScores: ChakraScore[];
   voiceProfile: VoiceProfile;
   dominantChakra: ChakraScore;
+  frozenWaveform: Float32Array | null;
 }
 
 export type AppScreen = 'idle' | 'countdown' | 'recording' | 'complete';

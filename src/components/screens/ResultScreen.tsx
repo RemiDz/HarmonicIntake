@@ -75,10 +75,10 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </p>
         </motion.div>
 
-        {/* Voice Signature waveform (static) */}
+        {/* Voice Signature waveform (frozen snapshot) */}
         <motion.div variants={fadeInUp}>
           <VoiceWaveform
-            timeDomainData={null}
+            timeDomainData={profile.frozenWaveform}
             rmsEnergy={profile.voiceProfile.rmsEnergy}
             fundamental={profile.fundamental}
             overtoneRichness={profile.richness / 100}

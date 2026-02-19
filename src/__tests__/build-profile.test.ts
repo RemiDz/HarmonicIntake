@@ -57,6 +57,7 @@ describe('buildProfile', () => {
       rmsHistory: Array(60).fill(0.05),
       sampleRate: 44100,
       fftSize: 4096,
+      frozenWaveform: null,
     });
 
     expect(profile.fundamental).toBe(440);
@@ -86,6 +87,7 @@ describe('buildProfile', () => {
       rmsHistory: [0.05, 0, 0.05, 0, 0.05],
       sampleRate: 44100,
       fftSize: 4096,
+      frozenWaveform: null,
     });
 
     expect(profile.fundamental).toBe(440);
@@ -102,6 +104,7 @@ describe('buildProfile', () => {
       rmsHistory: [0, 0, 0],
       sampleRate: 44100,
       fftSize: 4096,
+      frozenWaveform: null,
     });
 
     expect(profile.fundamental).toBe(0);
@@ -130,6 +133,7 @@ describe('buildProfile', () => {
       rmsHistory: Array(60).fill(0.08),
       sampleRate: 44100,
       fftSize: 4096,
+      frozenWaveform: null,
     });
 
     expect(profile.voiceProfile.jitter.relative).toBeGreaterThan(0);

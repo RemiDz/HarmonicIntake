@@ -123,10 +123,7 @@ function drawWaveform(
       : 0.2; // idle: gentle
   const maxAmplitude = (height / 2) * 0.8 * amplitudeFactor;
 
-  // Wave density: higher pitch = denser waves
-  const _waveLength = fundamental > 0 ? Math.max(60, 300 - fundamental) : 200;
-
-  // Jitter → wobble amount
+  // Jitter → wobble amount (live recording only)
   const jitterOffset = isRecording ? jitter * 5 : 0;
 
   for (let line = 0; line < visibleLines; line++) {
@@ -167,23 +164,22 @@ function drawWaveform(
 
       let y = centerY + yOffset;
 
-      if (timeDomainData && timeDomainData.length > 0 && isRecording) {
-        // Use real waveform data
+      if (timeDomainData && timeDomainData.length > 0) {
+        // Use real waveform data (live recording or frozen result)
         const dataIndex = Math.floor(progress * timeDomainData.length);
         const sample = timeDomainData[dataIndex] || 0;
         y += sample * maxAmplitude * (1 + lineProgress * 0.3);
       } else {
-        // Idle / result: gentle breathing sine
-        const speed = isResult ? 0.3 : 0.5;
-        const amp = isResult ? maxAmplitude * 0.5 : maxAmplitude * 0.3;
-        y += Math.sin(progress * Math.PI * 4 + time * speed + phaseOffset) * amp;
+        // Idle: gentle breathing sine (no audio data)
+        y += Math.sin(progress * Math.PI * 4 + time * 0.5 + phaseOffset) * maxAmplitude * 0.3;
       }
 
-      // Flowing animation overlay
-      const flowSpeed = isResult ? 0.8 : 1.5;
-      y += Math.sin(progress * Math.PI * 2 + time * flowSpeed + phaseOffset) * 8;
+      if (!isResult) {
+        // Flowing animation overlay (live + idle only, not result)
+        y += Math.sin(progress * Math.PI * 2 + time * 1.5 + phaseOffset) * 8;
+      }
 
-      // Jitter wobble
+      // Jitter wobble (live only)
       if (jitterOffset > 0) {
         y += Math.sin(progress * 20 + time * 3 + line) * jitterOffset;
       }
@@ -247,24 +243,31 @@ export function VoiceWaveform(props: VoiceWaveformProps) {
     const p = propsRef.current;
     const time = (performance.now() - startTimeRef.current) / 1000;
 
-    // Smooth colour transition
-    const targetColor = p.isRecording || p.isResult ? p.chakraColor : IDLE_COLOR;
-    currentColorRef.current = lerpColor(
-      currentColorRef.current,
-      targetColor,
-      COLOR_LERP_SPEED,
-    );
+    // Colour: immediate for result screen, smooth lerp for live/idle
+    if (p.isResult) {
+      currentColorRef.current = p.chakraColor;
+    } else {
+      const targetColor = p.isRecording ? p.chakraColor : IDLE_COLOR;
+      currentColorRef.current = lerpColor(
+        currentColorRef.current,
+        targetColor,
+        COLOR_LERP_SPEED,
+      );
+    }
 
-    // Multi-colour ribbon activates after 5s of recording
+    // Multi-colour ribbon: after 5s of recording, or always on result
     const recordingSecs = p.isRecording
       ? (performance.now() - recordingStartRef.current) / 1000
       : 0;
-    const multiColorActive = p.isRecording && recordingSecs > 5;
+    const multiColorActive = p.isResult || (p.isRecording && recordingSecs > 5);
 
     // Get actual canvas CSS width
     const w = widthRef.current;
 
     drawWaveform(ctx, w, p.height, time, currentColorRef.current, p, multiColorActive);
+
+    // Result screen: render once then stop (frozen voice signature)
+    if (p.isResult) return;
 
     animationRef.current = requestAnimationFrame(animate);
   }, []);

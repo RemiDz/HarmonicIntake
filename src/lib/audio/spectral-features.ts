@@ -61,8 +61,11 @@ export function getSpectralSlope(
   let n = 0;
 
   for (let i = startBin; i < endBin; i++) {
-    const freq = i * binRes;
     const db = frequencyData[i];
+    // Skip silent bins (-Infinity from getFloatFrequencyData) to avoid
+    // NaN from (-Infinity) - (-Infinity) in the linear regression.
+    if (!isFinite(db)) continue;
+    const freq = i * binRes;
     sumX += freq;
     sumY += db;
     sumXY += freq * db;

@@ -2,8 +2,9 @@
  * Normalisation & scoring utilities for voice biomarkers.
  */
 
-/** Clamp a value to the 0-1 range. */
+/** Clamp a value to the 0-1 range. Returns 0 for NaN/Infinity. */
 export function clamp01(v: number): number {
+  if (!isFinite(v)) return 0;
   return Math.max(0, Math.min(1, v));
 }
 

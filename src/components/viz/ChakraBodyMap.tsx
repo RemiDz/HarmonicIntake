@@ -19,8 +19,7 @@ const POSITIONS = [
 ];
 
 export function ChakraBodyMap({ scores }: ChakraBodyMapProps) {
-  // Scores are Root→Crown, positions are Root(bottom)→Crown(top)
-  const orderedScores = [...scores].reverse();
+  // Scores are Root→Crown, positions are Root(bottom)→Crown(top) — same order
 
   return (
     <div className="flex items-center justify-center" role="img" aria-label="Chakra body map">
@@ -46,7 +45,7 @@ export function ChakraBodyMap({ scores }: ChakraBodyMapProps) {
         <line x1="140" y1="75" x2="140" y2="295" stroke="var(--color-border)" strokeWidth="1" opacity="0.15" />
 
         {/* Chakra points */}
-        {orderedScores.map((score, i) => {
+        {scores.map((score, i) => {
           const pos = POSITIONS[i];
           if (!pos) return null;
 

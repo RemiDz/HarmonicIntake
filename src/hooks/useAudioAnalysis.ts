@@ -48,6 +48,7 @@ export function useAudioAnalysis() {
   const frequencyDataSnapshotsRef = useRef<Float32Array[]>([]);
   const allCyclesRef = useRef<GlottalCycle[]>([]);
   const rmsHistoryRef = useRef<number[]>([]);
+  const frozenWaveformRef = useRef<Float32Array | null>(null);
 
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -67,6 +68,7 @@ export function useAudioAnalysis() {
         rmsHistory: rmsHistoryRef.current,
         sampleRate,
         fftSize,
+        frozenWaveform: frozenWaveformRef.current,
       });
 
       setProfile(result);
@@ -137,6 +139,11 @@ export function useAudioAnalysis() {
     const recentReadings = readingsRef.current.slice(-STABILITY_WINDOW);
     const stability = calculateStability(recentReadings);
 
+    // Capture a frozen waveform snapshot during the stable middle phase
+    if (!frozenWaveformRef.current && hz > 0 && elapsed > 5 && stability > 0.3 && rms > 0.01) {
+      frozenWaveformRef.current = new Float32Array(timeDomain);
+    }
+
     // Live chakra scores (lightweight, spectral-only)
     const chakraScores = calculateLiveChakraScores(
       freqDomain,
@@ -170,6 +177,7 @@ export function useAudioAnalysis() {
       frequencyDataSnapshotsRef.current = [];
       allCyclesRef.current = [];
       rmsHistoryRef.current = [];
+      frozenWaveformRef.current = null;
 
       const recorder = await startRecording();
       recorderRef.current = recorder;
