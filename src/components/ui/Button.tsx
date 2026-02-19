@@ -8,6 +8,7 @@ interface ButtonProps {
   variant?: 'primary' | 'secondary' | 'ghost';
   disabled?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 export function Button({
@@ -16,6 +17,7 @@ export function Button({
   variant = 'primary',
   disabled = false,
   className = '',
+  style,
 }: ButtonProps) {
   const base =
     'relative inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50 disabled:opacity-40 disabled:pointer-events-none text-sm';
@@ -35,6 +37,7 @@ export function Button({
       className={`${base} ${variants[variant]} ${className}`}
       onClick={onClick}
       disabled={disabled}
+      style={style}
     >
       {children}
     </motion.button>

@@ -1,7 +1,8 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { RotateCcw, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { RotateCcw, Sparkles, FileText, Share2, Mail } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
@@ -10,8 +11,9 @@ import { ChakraBarChart } from '@/components/viz/ChakraBarChart';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { EmailProfile } from '@/components/share/EmailProfile';
-import { SaveCard } from '@/components/share/SaveCard';
+import { generateHTMLReport } from '@/lib/share/generate-report';
+import { generateShareCard } from '@/lib/share/generate-card';
+import { formatHumanEmailSubject, formatHumanEmailBody } from '@/lib/profile/humanize';
 import {
   getStabilityLabel,
   getRichnessLabel,
@@ -42,6 +44,25 @@ const fadeInUp = {
 export function ResultScreen({ profile, onReset }: ResultScreenProps) {
   const stabilityPct = Math.round(profile.stability * 100);
   const vp = profile.voiceProfile;
+  const [generatingCard, setGeneratingCard] = useState(false);
+
+  const handleViewReport = () => generateHTMLReport(profile);
+
+  const handleShareCard = async () => {
+    if (generatingCard) return;
+    setGeneratingCard(true);
+    try {
+      await generateShareCard(profile);
+    } finally {
+      setGeneratingCard(false);
+    }
+  };
+
+  const handleEmail = () => {
+    const subject = encodeURIComponent(formatHumanEmailSubject(profile));
+    const body = encodeURIComponent(formatHumanEmailBody(profile));
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
+  };
 
   return (
     <motion.div
@@ -288,19 +309,39 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Card>
         </motion.div>
 
-        {/* Share actions */}
+        {/* Share actions — primary row */}
         <motion.div variants={fadeInUp} className="flex gap-3">
-          <div className="flex-1">
-            <EmailProfile profile={profile} />
-          </div>
-          <div className="flex-1">
-            <SaveCard profile={profile} />
-          </div>
+          <Button
+            onClick={handleViewReport}
+            className="flex-1 py-3"
+            style={{ background: profile.dominantChakra.color, color: '#fff' }}
+          >
+            <FileText size={16} />
+            View Report
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleShareCard}
+            disabled={generatingCard}
+            className="flex-1 py-3"
+            style={{ borderColor: `${profile.dominantChakra.color}60` }}
+          >
+            <Share2 size={16} />
+            {generatingCard ? 'Generating...' : 'Share Card'}
+          </Button>
+        </motion.div>
+
+        {/* Share actions — secondary */}
+        <motion.div variants={fadeInUp} className="flex justify-center">
+          <Button variant="ghost" onClick={handleEmail}>
+            <Mail size={16} />
+            Email Summary
+          </Button>
         </motion.div>
 
         {/* New Analysis */}
         <motion.div variants={fadeInUp} className="flex justify-center">
-          <Button variant="secondary" onClick={onReset}>
+          <Button variant="ghost" onClick={onReset}>
             <RotateCcw size={16} />
             New Analysis
           </Button>
