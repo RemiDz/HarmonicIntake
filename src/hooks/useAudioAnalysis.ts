@@ -44,6 +44,11 @@ export function useAudioAnalysis() {
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const readingsRef = useRef<number[]>([]);
+  // Last valid values — persist across frames where pitch detection fails
+  const lastValidHzRef = useRef<number>(0);
+  const lastValidNoteRef = useRef<RealTimeData['currentNote']>(null);
+  const lastValidChakraRef = useRef<RealTimeData['currentChakra']>(null);
+  const lastValidOvertonesRef = useRef<Overtone[]>([]);
   const overtoneSnapshotsRef = useRef<Overtone[][]>([]);
   const frequencyDataSnapshotsRef = useRef<Float32Array[]>([]);
   const allCyclesRef = useRef<GlottalCycle[]>([]);
@@ -130,6 +135,12 @@ export function useAudioAnalysis() {
         const jitterResult = calculateJitter(periods);
         liveJitterRelative = jitterResult.relative;
       }
+
+      // Store last valid values so we can hold them when pitch drops out
+      lastValidHzRef.current = Math.round(hz * 10) / 10;
+      lastValidNoteRef.current = frequencyToNote(hz);
+      lastValidChakraRef.current = frequencyToChakra(hz);
+      lastValidOvertonesRef.current = overtones;
     }
 
     // Spectrum
@@ -152,12 +163,15 @@ export function useAudioAnalysis() {
       recorder.analyser.fftSize,
     );
 
+    // When pitch drops out (hz <= 0), hold the last valid values
+    // so the UI never flashes "—" or "No overtone data".
+    // The refs were already updated in the hz > 0 block above.
     setRealTimeData({
-      currentHz: hz > 0 ? Math.round(hz * 10) / 10 : 0,
-      currentNote: hz > 0 ? frequencyToNote(hz) : null,
-      currentChakra: hz > 0 ? frequencyToChakra(hz) : null,
+      currentHz: lastValidHzRef.current,
+      currentNote: lastValidNoteRef.current,
+      currentChakra: lastValidChakraRef.current,
       stability,
-      overtones,
+      overtones: hz > 0 ? overtones : lastValidOvertonesRef.current,
       spectrumData,
       elapsed,
       chakraScores,
@@ -179,6 +193,10 @@ export function useAudioAnalysis() {
       allCyclesRef.current = [];
       rmsHistoryRef.current = [];
       frozenWaveformRef.current = null;
+      lastValidHzRef.current = 0;
+      lastValidNoteRef.current = null;
+      lastValidChakraRef.current = null;
+      lastValidOvertonesRef.current = [];
 
       const recorder = await startRecording();
       recorderRef.current = recorder;

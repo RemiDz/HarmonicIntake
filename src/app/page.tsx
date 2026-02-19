@@ -12,8 +12,8 @@ export default function Home() {
   const { screen, realTimeData, profile, error, start, stop, reset, beginRecording } =
     useAudioAnalysis();
 
-  const accentColor =
-    realTimeData.currentChakra?.color || profile?.dominantChakra.color;
+  // Only use accent colour on the result screen (fixed, not flickering)
+  const accentColor = screen === 'complete' ? profile?.dominantChakra.color : undefined;
 
   return (
     <main className="relative min-h-screen">
