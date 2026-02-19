@@ -12,6 +12,17 @@ export function getFrequencyRangeDescription(hz: number): string {
 }
 
 /**
+ * Poetic one-line tone description for the hero section.
+ */
+export function getToneDescription(hz: number): string {
+  if (hz < 130) return 'A deep, grounding resonance \u2014 earthy and rooted';
+  if (hz < 180) return 'A warm, steady tone \u2014 naturally anchored';
+  if (hz < 230) return 'A resonant, mid-range voice \u2014 balanced and centred';
+  if (hz < 280) return 'A bright, clear tone \u2014 naturally expressive';
+  return 'A light, luminous frequency \u2014 airy and open';
+}
+
+/**
  * Translate stability (0-1) to a human-friendly description.
  */
 export function getStabilityDescription(stability: number): string {

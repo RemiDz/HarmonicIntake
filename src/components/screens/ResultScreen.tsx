@@ -5,9 +5,10 @@ import { useState } from 'react';
 import { RotateCcw, Sparkles, FileText, Share2, Mail } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
+import { OvertoneSpiral } from '@/components/viz/OvertoneSpiral';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
 import { ChakraBodyMap } from '@/components/viz/ChakraBodyMap';
-import { ChakraBarChart } from '@/components/viz/ChakraBarChart';
+import { VoiceQualityBar } from '@/components/viz/VoiceQualityBar';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +16,7 @@ import { CountingNumber } from '@/components/ui/CountingNumber';
 import { generateHTMLReport } from '@/lib/share/generate-report';
 import { generateShareCard } from '@/lib/share/generate-card';
 import { formatHumanEmailSubject, formatHumanEmailBody } from '@/lib/profile/humanize';
+import { getToneDescription } from '@/lib/profile/humanize';
 import {
   getStabilityLabel,
   getRichnessLabel,
@@ -42,9 +44,22 @@ const fadeInUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
+/** Map biomarkers to 0-100 bar positions */
+function getQualityPositions(profile: FrequencyProfile) {
+  const vp = profile.voiceProfile;
+  return {
+    steadiness: Math.max(0, Math.min(100, (1 - vp.jitter.relative / 2) * 100)),
+    projection: Math.max(0, Math.min(100, (vp.rmsEnergy / 0.15) * 100)),
+    clarity: Math.max(0, Math.min(100, ((vp.hnr - 5) / 30) * 100)),
+    expressiveness: Math.max(0, Math.min(100, (vp.pitchRange.rangeSemitones / 12) * 100)),
+    warmth: Math.max(0, Math.min(100, (Math.abs(vp.spectralSlope) / 0.01) * 100)),
+  };
+}
+
 export function ResultScreen({ profile, onReset }: ResultScreenProps) {
   const stabilityPct = Math.round(profile.stability * 100);
   const vp = profile.voiceProfile;
+  const positions = getQualityPositions(profile);
   const [generatingCard, setGeneratingCard] = useState(false);
 
   const handleViewReport = () => generateHTMLReport(profile);
@@ -65,6 +80,9 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
     window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
   };
 
+  // Format note with proper sharp symbol
+  const noteDisplay = profile.noteInfo.note.replace('#', '\u266F');
+
   return (
     <motion.div
       className="flex min-h-screen flex-col items-center px-6 py-8"
@@ -73,7 +91,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
       animate="visible"
     >
       <div className="w-full max-w-[420px] space-y-6">
-        {/* Header */}
+        {/* ── Header ── */}
         <motion.div variants={fadeInUp} className="text-center">
           <div className="mb-1 flex items-center justify-center gap-2 text-accent-primary">
             <Sparkles size={16} />
@@ -96,7 +114,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </p>
         </motion.div>
 
-        {/* Voice Signature waveform (frozen snapshot) */}
+        {/* ── Voice Signature waveform ── */}
         <motion.div variants={fadeInUp}>
           <VoiceWaveform
             timeDomainData={profile.frozenWaveform}
@@ -107,28 +125,31 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           />
         </motion.div>
 
-        {/* 3-column metrics with counting numbers */}
+        {/* ── Hero Note Display ── */}
+        <motion.div variants={fadeInUp} className="text-center">
+          <p
+            className="font-display text-[72px] font-light leading-none"
+            style={{
+              color: profile.dominantChakra.color,
+              textShadow: `0 0 30px ${profile.dominantChakra.color}40`,
+            }}
+          >
+            {noteDisplay}
+            <span className="text-4xl">{profile.noteInfo.octave}</span>
+          </p>
+          <p className="mt-2 font-mono text-lg text-text-secondary">
+            <CountingNumber value={profile.fundamental} decimals={1} duration={1000} />{' '}
+            <span className="text-sm text-text-muted">Hz</span>
+          </p>
+          <p className="mt-2 text-sm italic text-text-muted">
+            {getToneDescription(profile.fundamental)}
+          </p>
+        </motion.div>
+
+        {/* ── 3-column key metrics ── */}
         <motion.div variants={fadeInUp}>
           <Card className="p-4">
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <p className="text-[10px] tracking-wider text-text-dim uppercase">Fundamental</p>
-                <p className="mt-1 font-mono text-lg font-medium text-text-primary">
-                  <CountingNumber value={profile.fundamental} decimals={1} duration={1000} />
-                </p>
-                <p className="text-[10px] text-text-muted">Hz</p>
-              </div>
-              <div>
-                <p className="text-[10px] tracking-wider text-text-dim uppercase">Note</p>
-                <p className="mt-1 font-mono text-lg font-medium text-text-primary">
-                  {profile.noteInfo.note}
-                  {profile.noteInfo.octave}
-                </p>
-                <p className="text-[10px] text-text-muted">
-                  {profile.noteInfo.cents > 0 ? '+' : ''}
-                  {profile.noteInfo.cents}¢
-                </p>
-              </div>
               <div>
                 <p className="text-[10px] tracking-wider text-text-dim uppercase">Stability</p>
                 <p className="mt-1 font-mono text-lg font-medium text-text-primary">
@@ -138,88 +159,132 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
                   {getStabilityLabel(profile.stability)}
                 </p>
               </div>
+              <div>
+                <p className="text-[10px] tracking-wider text-text-dim uppercase">Clarity</p>
+                <p className="mt-1 font-mono text-lg font-medium text-text-primary">
+                  {vp.hnr >= 28 ? 'Clear' : vp.hnr >= 20 ? 'Warm' : 'Soft'}
+                </p>
+                <p className="text-[10px] text-text-muted">
+                  {Math.round(vp.hnr)} dB HNR
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] tracking-wider text-text-dim uppercase">Richness</p>
+                <p className="mt-1 font-mono text-lg font-medium text-text-primary">
+                  <CountingNumber value={profile.richness} suffix="%" duration={1000} />
+                </p>
+                <p className="text-[10px] text-text-muted">
+                  {getRichnessLabel(profile.richness)}
+                </p>
+              </div>
             </div>
           </Card>
         </motion.div>
 
-        {/* Voice Quality Insights */}
+        {/* ── Voice Quality Bars ── */}
+        <motion.div variants={fadeInUp}>
+          <p className="mb-3 text-[10px] tracking-wider text-text-dim uppercase">
+            Voice Qualities
+          </p>
+          <div className="space-y-2">
+            <VoiceQualityBar
+              label="Vocal Steadiness"
+              leftLabel="Fluid"
+              rightLabel="Steady"
+              position={positions.steadiness}
+              description={getJitterDescription(vp.jitter.relative)}
+              color={profile.dominantChakra.color}
+              delay={0}
+            />
+            <VoiceQualityBar
+              label="Projection"
+              leftLabel="Gentle"
+              rightLabel="Powerful"
+              position={positions.projection}
+              description={getShimmerDescription(vp.shimmer.db)}
+              color={profile.dominantChakra.color}
+              delay={0.08}
+            />
+            <VoiceQualityBar
+              label="Clarity"
+              leftLabel="Breathy"
+              rightLabel="Crystal"
+              position={positions.clarity}
+              description={getHnrDescription(vp.hnr)}
+              color={profile.dominantChakra.color}
+              delay={0.16}
+            />
+            <VoiceQualityBar
+              label="Expressiveness"
+              leftLabel="Contained"
+              rightLabel="Dynamic"
+              position={positions.expressiveness}
+              description={getPitchRangeDescription(vp.pitchRange.rangeSemitones)}
+              color={profile.dominantChakra.color}
+              delay={0.24}
+            />
+            <VoiceQualityBar
+              label="Warmth"
+              leftLabel="Bright"
+              rightLabel="Warm"
+              position={positions.warmth}
+              description={
+                positions.warmth > 65
+                  ? 'Your voice has a rich, warm tonal quality \u2014 naturally soothing and grounding.'
+                  : positions.warmth > 35
+                    ? 'Your voice carries a balanced tonal quality \u2014 neither too bright nor too warm.'
+                    : 'Your voice has a bright, clear tonal quality \u2014 naturally energising and uplifting.'
+              }
+              color={profile.dominantChakra.color}
+              delay={0.32}
+            />
+          </div>
+        </motion.div>
+
+        {/* ── Harmonic Fingerprint (Overtone Spiral) ── */}
         <motion.div variants={fadeInUp}>
           <Card className="p-4">
-            <p className="mb-3 text-[10px] tracking-wider text-text-dim uppercase">
-              Voice Qualities
+            <p className="mb-1 text-center text-[10px] tracking-wider text-text-dim uppercase">
+              Your Harmonic Fingerprint
             </p>
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-text-dim">Vocal Steadiness</p>
-                  <p className="font-mono text-[10px] text-text-muted">
-                    {vp.jitter.relative < 0.5 ? 'Calm' : vp.jitter.relative < 1.0 ? 'Natural' : 'Fluid'}
-                  </p>
-                </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
-                  {getJitterDescription(vp.jitter.relative)}
-                </p>
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-text-dim">Projection</p>
-                  <p className="font-mono text-[10px] text-text-muted">
-                    {vp.shimmer.db < 0.2 ? 'Strong' : vp.shimmer.db < 0.4 ? 'Gentle' : 'Soft'}
-                  </p>
-                </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
-                  {getShimmerDescription(vp.shimmer.db)}
-                </p>
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-text-dim">Clarity</p>
-                  <p className="font-mono text-[10px] text-text-muted">
-                    {vp.hnr >= 28 ? 'Clear' : vp.hnr >= 20 ? 'Warm' : 'Soft'}
-                  </p>
-                </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
-                  {getHnrDescription(vp.hnr)}
-                </p>
-              </div>
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] text-text-dim">Expressiveness</p>
-                  <p className="font-mono text-[10px] text-text-muted">
-                    {vp.pitchRange.rangeSemitones >= 6
-                      ? 'Dynamic'
-                      : vp.pitchRange.rangeSemitones >= 3
-                        ? 'Balanced'
-                        : 'Focused'}
-                  </p>
-                </div>
-                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
-                  {getPitchRangeDescription(vp.pitchRange.rangeSemitones)}
-                </p>
-              </div>
-            </div>
+            <p className="mb-4 text-center text-[10px] text-text-dim">
+              The unique overtone pattern of your voice
+            </p>
+            <OvertoneSpiral
+              overtones={profile.overtones}
+              fundamental={profile.fundamental}
+            />
           </Card>
         </motion.div>
 
-        {/* Chakra Body Map */}
+        {/* ── Chakra Energy Map ── */}
         {profile.chakraScores.length > 0 && (
           <motion.div variants={fadeInUp}>
             <Card className="p-4">
               <p className="mb-2 text-center text-[10px] tracking-wider text-text-dim uppercase">
                 Your Energy Centres
               </p>
-              <ChakraBodyMap scores={profile.chakraScores} />
+              <p className="mb-3 text-center text-[10px] text-text-dim">
+                Tap a chakra to learn more
+              </p>
+              <ChakraBodyMap
+                scores={profile.chakraScores}
+                dominantName={profile.dominantChakra.name}
+              />
             </Card>
           </motion.div>
         )}
 
-        {/* Dominant chakra insight */}
+        {/* ── Dominant Chakra Insight ── */}
         <motion.div variants={fadeInUp}>
           <Card className="p-4">
             <div className="flex items-start gap-3">
               <div
                 className="mt-1 h-3 w-3 flex-shrink-0 rounded-full"
-                style={{ backgroundColor: profile.dominantChakra.color }}
+                style={{
+                  backgroundColor: profile.dominantChakra.color,
+                  boxShadow: `0 0 8px ${profile.dominantChakra.color}`,
+                }}
               />
               <div>
                 <p className="text-sm font-medium text-text-primary">
@@ -237,19 +302,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Card>
         </motion.div>
 
-        {/* Chakra Bar Chart breakdown */}
-        {profile.chakraScores.length > 0 && (
-          <motion.div variants={fadeInUp}>
-            <Card className="p-4">
-              <p className="mb-3 text-[10px] tracking-wider text-text-dim uppercase">
-                Chakra Breakdown
-              </p>
-              <ChakraBarChart scores={profile.chakraScores} />
-            </Card>
-          </motion.div>
-        )}
-
-        {/* Overtones + Richness */}
+        {/* ── Overtone Presence (bar breakdown) ── */}
         <motion.div variants={fadeInUp}>
           <Card className="p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -265,7 +318,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Card>
         </motion.div>
 
-        {/* Session Recommendations */}
+        {/* ── Session Guidance ── */}
         <motion.div variants={fadeInUp}>
           <Card className="p-4">
             <p className="mb-3 text-[10px] tracking-wider text-text-dim uppercase">
@@ -313,7 +366,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Card>
         </motion.div>
 
-        {/* Share actions — primary row */}
+        {/* ── Share actions — primary row ── */}
         <motion.div variants={fadeInUp} className="flex gap-3">
           <Button
             onClick={handleViewReport}
@@ -335,7 +388,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Button>
         </motion.div>
 
-        {/* Share actions — secondary */}
+        {/* ── Share actions — secondary ── */}
         <motion.div variants={fadeInUp} className="flex justify-center">
           <Button variant="ghost" onClick={handleEmail}>
             <Mail size={16} />
@@ -343,7 +396,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Button>
         </motion.div>
 
-        {/* New Analysis */}
+        {/* ── New Analysis ── */}
         <motion.div variants={fadeInUp} className="flex justify-center">
           <Button variant="ghost" onClick={onReset}>
             <RotateCcw size={16} />
@@ -351,7 +404,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Button>
         </motion.div>
 
-        {/* Disclaimer */}
+        {/* ── Disclaimer ── */}
         <motion.p
           variants={fadeInUp}
           className="px-4 text-center text-[9px] leading-relaxed text-text-dim"
@@ -361,7 +414,7 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           consult a qualified healthcare professional.
         </motion.p>
 
-        {/* Footer */}
+        {/* ── Footer ── */}
         <motion.p
           variants={fadeInUp}
           className="pb-8 text-center text-[10px] tracking-wider text-text-dim uppercase"
