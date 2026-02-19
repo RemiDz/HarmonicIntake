@@ -8,6 +8,7 @@ import { CountdownScreen } from '@/components/screens/CountdownScreen';
 import { LiveScreen } from '@/components/screens/LiveScreen';
 import { AnalysingScreen } from '@/components/screens/AnalysingScreen';
 import { ResultScreen } from '@/components/screens/ResultScreen';
+import { ComparisonScreen } from '@/components/screens/ComparisonScreen';
 
 // Transition variants per screen
 const idleVariants = {
@@ -41,8 +42,18 @@ const resultVariants = {
 };
 
 export default function Home() {
-  const { screen, realTimeData, profile, error, start, stop, reset, beginRecording } =
-    useAudioAnalysis();
+  const {
+    screen,
+    realTimeData,
+    profile,
+    previousProfile,
+    error,
+    start,
+    stop,
+    reset,
+    beginRecording,
+    startComparison,
+  } = useAudioAnalysis();
 
   // Accent colour for particles
   const particleAccent =
@@ -51,6 +62,9 @@ export default function Home() {
       : screen === 'analysing' || screen === 'complete'
         ? profile?.dominantChakra.color
         : undefined;
+
+  // Show comparison screen when both profiles exist on the complete screen
+  const showComparison = screen === 'complete' && profile && previousProfile;
 
   return (
     <main className="relative min-h-screen">
@@ -114,7 +128,7 @@ export default function Home() {
           </motion.div>
         )}
 
-        {screen === 'complete' && profile && (
+        {screen === 'complete' && profile && !showComparison && (
           <motion.div
             key="complete"
             variants={resultVariants}
@@ -122,7 +136,27 @@ export default function Home() {
             animate="animate"
             exit="exit"
           >
-            <ResultScreen profile={profile} onReset={reset} />
+            <ResultScreen
+              profile={profile}
+              onReset={reset}
+              onCompare={startComparison}
+            />
+          </motion.div>
+        )}
+
+        {showComparison && (
+          <motion.div
+            key="comparison"
+            variants={resultVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            <ComparisonScreen
+              before={previousProfile}
+              after={profile}
+              onReset={reset}
+            />
           </motion.div>
         )}
       </AnimatePresence>

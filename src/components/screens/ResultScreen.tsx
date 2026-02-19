@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useState } from 'react';
-import { RotateCcw, Sparkles, FileText, Share2, Mail } from 'lucide-react';
+import { RotateCcw, Sparkles, FileText, Share2, Mail, GitCompareArrows } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
 import { OvertoneSpiral } from '@/components/viz/OvertoneSpiral';
@@ -34,6 +34,7 @@ import {
 interface ResultScreenProps {
   profile: FrequencyProfile;
   onReset: () => void;
+  onCompare: () => void;
 }
 
 const stagger = {
@@ -58,7 +59,7 @@ function getQualityPositions(profile: FrequencyProfile) {
   };
 }
 
-export function ResultScreen({ profile, onReset }: ResultScreenProps) {
+export function ResultScreen({ profile, onReset, onCompare }: ResultScreenProps) {
   const stabilityPct = Math.round(profile.stability * 100);
   const vp = profile.voiceProfile;
   const positions = getQualityPositions(profile);
@@ -421,7 +422,13 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           </Button>
         </motion.div>
 
-        {/* ── New Analysis ── */}
+        {/* ── Compare / New Analysis ── */}
+        <motion.div variants={fadeInUp} className="flex justify-center gap-3">
+          <Button variant="ghost" onClick={onCompare}>
+            <GitCompareArrows size={16} />
+            Record Again to Compare
+          </Button>
+        </motion.div>
         <motion.div variants={fadeInUp} className="flex justify-center">
           <Button variant="ghost" onClick={onReset}>
             <RotateCcw size={16} />

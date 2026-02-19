@@ -38,6 +38,7 @@ export function useAudioAnalysis() {
   const [screen, setScreen] = useState<AppScreen>('idle');
   const [realTimeData, setRealTimeData] = useState<RealTimeData>(EMPTY_REALTIME);
   const [profile, setProfile] = useState<FrequencyProfile | null>(null);
+  const [previousProfile, setPreviousProfile] = useState<FrequencyProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const recorderRef = useRef<AudioRecorderHandle | null>(null);
@@ -245,19 +246,32 @@ export function useAudioAnalysis() {
   const reset = useCallback(() => {
     cleanup();
     setProfile(null);
+    setPreviousProfile(null);
     setRealTimeData(EMPTY_REALTIME);
     setError(null);
     setScreen('idle');
   }, [cleanup]);
 
+  /** Save current profile as "before" and start a new recording for comparison */
+  const startComparison = useCallback(() => {
+    if (profile) {
+      setPreviousProfile(profile);
+    }
+    setProfile(null);
+    setRealTimeData(EMPTY_REALTIME);
+    setScreen('countdown');
+  }, [profile]);
+
   return {
     screen,
     realTimeData,
     profile,
+    previousProfile,
     error,
     start,
     stop,
     reset,
     beginRecording,
+    startComparison,
   };
 }
