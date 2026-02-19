@@ -6,6 +6,7 @@ import { ParticleField } from '@/components/ui/ParticleField';
 import { IdleScreen } from '@/components/screens/IdleScreen';
 import { CountdownScreen } from '@/components/screens/CountdownScreen';
 import { LiveScreen } from '@/components/screens/LiveScreen';
+import { AnalysingScreen } from '@/components/screens/AnalysingScreen';
 import { ResultScreen } from '@/components/screens/ResultScreen';
 
 // Transition variants per screen
@@ -24,7 +25,13 @@ const countdownVariants = {
 const recordingVariants = {
   initial: { opacity: 0 },
   animate: { opacity: 1, transition: { duration: 0.4 } },
-  exit: { opacity: 0, scale: 0.98, transition: { duration: 0.3 } },
+  exit: { opacity: 0, transition: { duration: 0.4 } },
+};
+
+const analysingVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.4 } },
+  exit: { opacity: 0, y: -20, transition: { duration: 0.4 } },
 };
 
 const resultVariants = {
@@ -41,7 +48,7 @@ export default function Home() {
   const particleAccent =
     screen === 'recording'
       ? realTimeData.currentChakra?.color
-      : screen === 'complete'
+      : screen === 'analysing' || screen === 'complete'
         ? profile?.dominantChakra.color
         : undefined;
 
@@ -89,6 +96,21 @@ export default function Home() {
             exit="exit"
           >
             <LiveScreen data={realTimeData} onStop={stop} />
+          </motion.div>
+        )}
+
+        {screen === 'analysing' && profile && (
+          <motion.div
+            key="analysing"
+            variants={analysingVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            <AnalysingScreen
+              frozenWaveform={profile.frozenWaveform}
+              chakraColor={profile.dominantChakra.color}
+            />
           </motion.div>
         )}
 

@@ -69,7 +69,7 @@ export function ParticleField({ mode, accentColor, rmsEnergy = 0 }: ParticleFiel
 
     // Determine colour
     let rgb: [number, number, number];
-    if ((mode === 'recording' || mode === 'complete') && accentColor) {
+    if ((mode === 'recording' || mode === 'analysing' || mode === 'complete') && accentColor) {
       rgb = hexToRgb(accentColor);
     } else {
       // Warm white/cyan default
@@ -78,7 +78,7 @@ export function ParticleField({ mode, accentColor, rmsEnergy = 0 }: ParticleFiel
 
     const particles = particlesRef.current;
     const isRecording = mode === 'recording';
-    const isResult = mode === 'complete';
+    const isResult = mode === 'complete' || mode === 'analysing';
 
     // Waveform attractor zone (center-ish of screen, where waveform lives)
     const attractY = h * 0.35;

@@ -57,11 +57,17 @@ export function useAudioAnalysis() {
 
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (analysingTimerRef.current) {
+      clearTimeout(analysingTimerRef.current);
+      analysingTimerRef.current = null;
+    }
     if (recorderRef.current) {
       recorderRef.current.stop();
       recorderRef.current = null;
     }
   }, []);
+
+  const analysingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doFinish = useCallback(
     (sampleRate: number, fftSize: number) => {
@@ -77,7 +83,12 @@ export function useAudioAnalysis() {
       });
 
       setProfile(result);
-      setScreen('complete');
+      setScreen('analysing');
+
+      // Transition to complete after 1.8s "analysing" moment
+      analysingTimerRef.current = setTimeout(() => {
+        setScreen('complete');
+      }, 1800);
     },
     [],
   );

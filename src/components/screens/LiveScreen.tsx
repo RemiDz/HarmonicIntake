@@ -3,12 +3,8 @@
 import { motion } from 'framer-motion';
 import type { RealTimeData } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
-import { SpectrumBar } from '@/components/viz/SpectrumBar';
-import { OvertoneChart } from '@/components/viz/OvertoneChart';
-import { StabilityMeter } from '@/components/viz/StabilityMeter';
 import { ChakraLiveDots } from '@/components/viz/ChakraLiveDots';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 
 interface LiveScreenProps {
@@ -21,6 +17,7 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
   const progress = Math.min(data.elapsed / duration, 1);
   const circumference = 2 * Math.PI * 28;
   const strokeDashoffset = circumference * (1 - progress);
+  const timerColor = data.currentChakra?.color || 'var(--color-accent-primary)';
 
   return (
     <motion.div
@@ -37,7 +34,7 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
             <span className="font-mono text-xs text-text-secondary">Listening</span>
           </div>
 
-          {/* Circular timer */}
+          {/* Circular timer — colour matches dominant chakra */}
           <div className="relative flex h-14 w-14 items-center justify-center">
             <svg className="absolute -rotate-90" width="60" height="60" viewBox="0 0 60 60">
               <circle
@@ -53,12 +50,12 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
                 cy="30"
                 r="28"
                 fill="none"
-                stroke="var(--color-accent-primary)"
+                stroke={timerColor}
                 strokeWidth="2"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
-                style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                style={{ transition: 'stroke-dashoffset 0.3s ease, stroke 0.5s ease' }}
               />
             </svg>
             <span className="font-mono text-xs text-text-secondary">
@@ -73,21 +70,14 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
           rmsEnergy={data.rmsEnergy}
           chakraColor={data.currentChakra?.color || '#4FA8D6'}
           mode="recording"
-          height={200}
+          height={220}
         />
-
-        {/* Live chakra dots */}
-        {data.chakraScores.length > 0 && (
-          <div className="flex justify-center">
-            <ChakraLiveDots scores={data.chakraScores} />
-          </div>
-        )}
 
         {/* Frequency + Note */}
         <div className="text-center">
-          <p className="font-mono text-4xl font-medium text-text-primary">
-            {data.currentHz > 0 ? `${data.currentHz}` : '—'}
-            <span className="ml-1 text-lg text-text-muted">Hz</span>
+          <p className="font-mono text-5xl font-medium text-text-primary">
+            {data.currentHz > 0 ? `${data.currentHz}` : '\u2014'}
+            <span className="ml-1 text-xl text-text-muted">Hz</span>
           </p>
           {data.currentNote && (
             <p className="mt-1 font-mono text-sm text-text-secondary">
@@ -116,48 +106,12 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
           </div>
         )}
 
-        {/* Spectrum */}
-        <Card className="p-4">
-          <p className="mb-2 text-[10px] tracking-wider text-text-dim uppercase">Spectrum</p>
-          <SpectrumBar data={data.spectrumData} />
-        </Card>
-
-        {/* Overtones */}
-        <Card className="p-4">
-          <p className="mb-2 text-[10px] tracking-wider text-text-dim uppercase">Overtones</p>
-          <OvertoneChart overtones={data.overtones} />
-        </Card>
-
-        {/* Stability + Live Biomarkers */}
-        <Card className="p-4">
-          <StabilityMeter value={data.stability} />
-          {(data.liveHnr > 0 || data.liveJitterRelative > 0) && (
-            <div className="mt-3 flex gap-4 border-t border-border pt-3">
-              {data.liveHnr > 0 && (
-                <div className="flex-1 text-center">
-                  <p className="text-[10px] text-text-dim">Clarity</p>
-                  <p className="mt-0.5 font-mono text-sm text-text-primary">
-                    {data.liveHnr} dB
-                  </p>
-                  <p className="text-[10px] text-text-muted">
-                    {data.liveHnr >= 28 ? 'Clear' : data.liveHnr >= 20 ? 'Warm' : 'Soft'}
-                  </p>
-                </div>
-              )}
-              {data.liveJitterRelative > 0 && (
-                <div className="flex-1 text-center">
-                  <p className="text-[10px] text-text-dim">Steadiness</p>
-                  <p className="mt-0.5 font-mono text-sm text-text-primary">
-                    {data.liveJitterRelative}%
-                  </p>
-                  <p className="text-[10px] text-text-muted">
-                    {data.liveJitterRelative < 0.5 ? 'Calm' : data.liveJitterRelative < 1.0 ? 'Natural' : 'Fluid'}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
+        {/* Live chakra dots */}
+        {data.chakraScores.length > 0 && (
+          <div className="flex justify-center">
+            <ChakraLiveDots scores={data.chakraScores} />
+          </div>
+        )}
 
         {/* End early */}
         <div className="flex justify-center pt-2">

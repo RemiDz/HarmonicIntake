@@ -85,7 +85,7 @@ export interface FrequencyProfile {
   frozenWaveform: Float32Array | null;
 }
 
-export type AppScreen = 'idle' | 'countdown' | 'recording' | 'complete';
+export type AppScreen = 'idle' | 'countdown' | 'recording' | 'analysing' | 'complete';
 
 export interface RealTimeData {
   currentHz: number;
