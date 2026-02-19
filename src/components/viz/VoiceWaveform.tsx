@@ -1,239 +1,165 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
-import type { ChakraScore } from '@/lib/types';
+import { useRef, useEffect, useCallback } from 'react';
 
-// ── Constants ──
-
-const POINTS = 128;
-const IDLE_COLOR = '#4FA8D6';
-const COLOR_LERP_SPEED = 0.02;
-
-// Mode-specific config
-const CONFIG = {
-  idle:      { lines: 4,  maxAmp: 15, baseOpacity: 0.2,  glowSize: 4,  spread: 0.3 },
-  recording: { lines: 12, maxAmp: 70, baseOpacity: 0.5,  glowSize: 10, spread: 0.6 },
-  result:    { lines: 8,  maxAmp: 50, baseOpacity: 0.4,  glowSize: 6,  spread: 0.5 },
-} as const;
-
-// ── Props ──
-
-export interface VoiceWaveformProps {
+interface VoiceWaveformProps {
   timeDomainData: Float32Array | null;
   rmsEnergy: number;
-  fundamental: number;
-  overtoneRichness: number;
-  jitter: number;
-  shimmer: number;
   chakraColor: string;
-  chakraScores?: ChakraScore[];
-  isRecording: boolean;
-  isResult: boolean;
-  height: number;
+  secondaryColor?: string;
+  mode: 'idle' | 'recording' | 'result';
+  height?: number;
 }
 
-// ── Colour Utilities ──
-
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.startsWith('#') ? hex.slice(1) : hex;
-  return [
-    parseInt(h.slice(0, 2), 16) || 0,
-    parseInt(h.slice(2, 4), 16) || 0,
-    parseInt(h.slice(4, 6), 16) || 0,
-  ];
-}
-
-function rgbToHex(r: number, g: number, b: number): string {
-  const cl = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-  return '#' + cl(r).toString(16).padStart(2, '0') +
-    cl(g).toString(16).padStart(2, '0') + cl(b).toString(16).padStart(2, '0');
-}
-
-function lerpColor(a: string, b: string, t: number): string {
-  const [rA, gA, bA] = hexToRgb(a);
-  const [rB, gB, bB] = hexToRgb(b);
-  return rgbToHex(rA + (rB - rA) * t, gA + (gB - gA) * t, bA + (bB - bA) * t);
-}
-
+// Convert hex to rgba
 function hexToRgba(hex: string, alpha: number): string {
-  const [r, g, b] = hexToRgb(hex);
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-// ── Multi-colour: line → colour from top chakra scores ──
-
-function getLineColor(
-  lineIndex: number,
-  totalLines: number,
-  scores: ChakraScore[],
-  fallback: string,
-): string {
-  if (scores.length < 2) return fallback;
-  const sorted = [...scores].sort((a, b) => b.score - a.score);
-  const top3 = sorted.slice(0, 3);
-  const seg = totalLines / top3.length;
-  const idx = Math.min(Math.floor(lineIndex / seg), top3.length - 1);
-  return top3[idx].color;
+// Interpolate between two hex colours
+function lerpHex(colA: string, colB: string, t: number): string {
+  const rA = parseInt(colA.slice(1, 3), 16), gA = parseInt(colA.slice(3, 5), 16), bA = parseInt(colA.slice(5, 7), 16);
+  const rB = parseInt(colB.slice(1, 3), 16), gB = parseInt(colB.slice(3, 5), 16), bB = parseInt(colB.slice(5, 7), 16);
+  const r = Math.round(rA + (rB - rA) * t);
+  const g = Math.round(gA + (gB - gA) * t);
+  const b = Math.round(bA + (bB - bA) * t);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
-// ── Drawing ──
-
-function drawWaveform(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  time: number,
-  color: string,
-  props: VoiceWaveformProps,
-  multiColor: boolean,
-) {
-  const { timeDomainData, rmsEnergy, isRecording, isResult, chakraScores } = props;
-
-  ctx.clearRect(0, 0, width, height);
-
-  const mode = isRecording ? 'recording' : isResult ? 'result' : 'idle';
-  const c = CONFIG[mode];
-  const centerY = height / 2;
-
-  // Scale amplitude with actual loudness during recording
-  const ampScale = mode === 'recording' ? Math.max(0.3, rmsEnergy * 4) : 0.5;
-
-  for (let line = 0; line < c.lines; line++) {
-    // lineT: 0 to 1 spread evenly across THIS mode's line count
-    const lineT = c.lines > 1 ? line / (c.lines - 1) : 0.5;
-
-    // Vertical offset — spread lines across the height
-    const verticalOffset = (lineT - 0.5) * height * c.spread;
-
-    // Phase offset — each line slightly shifted in time
-    const phase = lineT * Math.PI * 0.8;
-
-    // Opacity — center lines brighter, outer lines dimmer
-    const distFromCenter = Math.abs(lineT - 0.5) * 2; // 0 at center, 1 at edges
-    const opacity = c.baseOpacity * (1 - distFromCenter * 0.6);
-
-    // Amplitude variation per line — center lines taller
-    const lineAmpScale = 1 - distFromCenter * 0.4;
-
-    // Determine colour for this line
-    let lineColor = color;
-    if (multiColor && chakraScores && chakraScores.length >= 2) {
-      lineColor = getLineColor(line, c.lines, chakraScores, color);
-    }
-
-    // Glow: result mode pulses gently, recording scales with RMS
-    let glowSize = c.glowSize * (1 - distFromCenter * 0.5);
-    if (mode === 'result') {
-      glowSize = 4 + Math.sin(time * 0.8) * 2; // pulse 4-8px
-    } else if (mode === 'recording') {
-      glowSize += rmsEnergy * 6;
-    }
-
-    ctx.beginPath();
-    ctx.strokeStyle = hexToRgba(lineColor, opacity);
-    ctx.lineWidth = 1.8;
-    ctx.shadowColor = lineColor;
-    ctx.shadowBlur = glowSize;
-
-    let prevX = 0;
-    let prevY = centerY;
-
-    for (let i = 0; i <= POINTS; i++) {
-      const x = (i / POINTS) * width;
-      const t = i / POINTS;
-
-      // Envelope — fade at horizontal edges
-      const envelope = Math.sin(t * Math.PI);
-
-      let displacement = 0;
-
-      if (timeDomainData && timeDomainData.length > 0 && mode !== 'idle') {
-        // Use real audio data
-        const dataIdx = Math.floor(t * timeDomainData.length);
-        const sample = timeDomainData[Math.min(dataIdx, timeDomainData.length - 1)] || 0;
-        displacement = sample * c.maxAmp * ampScale * lineAmpScale;
-      }
-
-      // Add flowing animation (idle + recording, not result)
-      if (mode !== 'result') {
-        displacement += Math.sin(t * Math.PI * 3 + time * 1.2 + phase) * c.maxAmp * 0.15;
-      }
-
-      // Idle mode: pure sine waves
-      if (mode === 'idle') {
-        displacement = Math.sin(t * Math.PI * 2 + time * 0.4 + phase) * c.maxAmp * 0.8;
-      }
-
-      // Apply envelope
-      displacement *= envelope;
-
-      const y = centerY + verticalOffset + displacement;
-
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        // Smooth quadratic curve
-        const cpX = (prevX + x) / 2;
-        const cpY = (prevY + y) / 2;
-        ctx.quadraticCurveTo(prevX, prevY, cpX, cpY);
-      }
-
-      prevX = x;
-      prevY = y;
-    }
-
-    ctx.stroke();
-  }
-
-  ctx.shadowBlur = 0;
-}
-
-// ── Component ──
-
-export function VoiceWaveform(props: VoiceWaveformProps) {
+export default function VoiceWaveform({
+  timeDomainData,
+  rmsEnergy,
+  chakraColor,
+  secondaryColor,
+  mode,
+  height: propHeight,
+}: VoiceWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>(0);
-  const startTimeRef = useRef<number>(performance.now());
-  const currentColorRef = useRef<string>(IDLE_COLOR);
   const containerRef = useRef<HTMLDivElement>(null);
-  const widthRef = useRef<number>(420);
-  const recordingStartRef = useRef<number>(0);
+  const animFrameRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(Date.now());
+  const widthRef = useRef<number>(400);
+  const heightRef = useRef<number>(propHeight || 200);
 
-  useEffect(() => {
-    if (props.isRecording) {
-      recordingStartRef.current = performance.now();
-    }
-  }, [props.isRecording]);
+  // Store latest props in refs for animation loop
+  const propsRef = useRef({ timeDomainData, rmsEnergy, chakraColor, secondaryColor, mode });
+  propsRef.current = { timeDomainData, rmsEnergy, chakraColor, secondaryColor, mode };
 
-  const propsRef = useRef(props);
-  propsRef.current = props;
-
-  const animate = useCallback(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const p = propsRef.current;
-    const time = (performance.now() - startTimeRef.current) / 1000;
+    const { timeDomainData, rmsEnergy, chakraColor, secondaryColor, mode } = propsRef.current;
+    const W = widthRef.current;
+    const H = heightRef.current;
+    const time = (Date.now() - startTimeRef.current) / 1000;
 
-    // Colour: immediate for result, smooth lerp for live/idle
-    if (p.isResult) {
-      currentColorRef.current = p.chakraColor;
-    } else {
-      const target = p.isRecording ? p.chakraColor : IDLE_COLOR;
-      currentColorRef.current = lerpColor(currentColorRef.current, target, COLOR_LERP_SPEED);
+    ctx.clearRect(0, 0, W, H);
+
+    const centerY = H / 2;
+
+    // ============================================================
+    // CONFIGURATION PER MODE
+    // ============================================================
+    const LINE_COUNT = mode === 'idle' ? 16 : mode === 'recording' ? 24 : 20;
+    const BASE_AMPLITUDE = mode === 'idle' ? H * 0.2 : H * 0.35;
+    const SPEED = mode === 'idle' ? 0.3 : mode === 'result' ? 0.05 : 0.8;
+    const GLOW = mode === 'idle' ? 6 : mode === 'recording' ? 12 : 8;
+
+    // Audio-reactive amplitude boost
+    const audioBoost = mode === 'recording' ? Math.max(0.5, rmsEnergy * 5) : 1.0;
+
+    // Colour setup
+    const color1 = chakraColor || '#4FA8D6';
+    const color2 = secondaryColor || lerpHex(color1, '#ffffff', 0.3);
+
+    for (let line = 0; line < LINE_COUNT; line++) {
+      const lineT = line / (LINE_COUNT - 1); // 0 to 1
+
+      // ============================================================
+      // EACH LINE GETS A UNIQUE WAVE SHAPE
+      // This is what makes them weave through each other!
+      // ============================================================
+
+      // Each line has a different frequency (1.5 to 4 full waves across the canvas)
+      const frequency = 1.5 + lineT * 2.5;
+
+      // Each line has a different phase offset
+      const phaseOffset = lineT * Math.PI * 2;
+
+      // Each line has slightly different amplitude
+      const ampVariation = 0.6 + Math.sin(lineT * Math.PI) * 0.4; // Center lines bigger
+
+      // Opacity: center lines brighter
+      const distFromCenter = Math.abs(lineT - 0.5) * 2;
+      const opacity = 0.08 + (1 - distFromCenter) * 0.25;
+
+      // Colour: blend from color1 to color2 across lines
+      const lineColor = lerpHex(color1, color2, lineT);
+
+      ctx.beginPath();
+      ctx.strokeStyle = hexToRgba(lineColor, opacity);
+      ctx.lineWidth = 1.2;
+      ctx.shadowColor = lineColor;
+      ctx.shadowBlur = GLOW * (1 - distFromCenter * 0.5);
+
+      const segments = 200; // Smooth curves need many points
+
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments; // 0 to 1 across width
+        const x = t * W;
+
+        // ============================================================
+        // ENVELOPE: Amplitude tapers at edges (0 at edges, max at center)
+        // This creates the "spindle" shape from the reference images
+        // ============================================================
+        const envelope = Math.pow(Math.sin(t * Math.PI), 1.5);
+
+        // ============================================================
+        // WAVE DISPLACEMENT
+        // ============================================================
+        let y = 0;
+
+        // Primary wave for this line
+        y += Math.sin(t * Math.PI * 2 * frequency + time * SPEED * 2 + phaseOffset);
+
+        // Secondary harmonic (adds complexity)
+        y += 0.3 * Math.sin(t * Math.PI * 2 * (frequency * 2.1) + time * SPEED * 1.3 + phaseOffset * 1.5);
+
+        // Slow drift (makes lines move organically)
+        y += 0.2 * Math.sin(t * Math.PI * 1.5 + time * SPEED * 0.7 + line * 0.5);
+
+        // If we have real audio data during recording, modulate the amplitude
+        if (timeDomainData && timeDomainData.length > 0 && mode === 'recording') {
+          const dataIdx = Math.floor(t * (timeDomainData.length - 1));
+          const sample = timeDomainData[dataIdx] || 0;
+          // Mix audio data into the wave (adds real voice texture)
+          y += sample * 2;
+        }
+
+        // Apply envelope and amplitude
+        const finalY = centerY + y * BASE_AMPLITUDE * ampVariation * envelope * audioBoost;
+
+        if (i === 0) {
+          ctx.moveTo(x, finalY);
+        } else {
+          ctx.lineTo(x, finalY);
+        }
+      }
+
+      ctx.stroke();
     }
 
-    // Multi-colour ribbon: after 5s of recording, or always on result
-    const recSecs = p.isRecording
-      ? (performance.now() - recordingStartRef.current) / 1000
-      : 0;
-    const multiColor = p.isResult || (p.isRecording && recSecs > 5);
+    // Reset shadow between frames
+    ctx.shadowBlur = 0;
 
-    drawWaveform(ctx, widthRef.current, p.height, time, currentColorRef.current, p, multiColor);
-
-    animationRef.current = requestAnimationFrame(animate);
+    // Continue animation
+    animFrameRef.current = requestAnimationFrame(draw);
   }, []);
 
   useEffect(() => {
@@ -241,42 +167,37 @@ export function VoiceWaveform(props: VoiceWaveformProps) {
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    const setupSize = (w: number, h: number) => {
+    // Size the canvas
+    const resize = () => {
+      const rect = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
+      widthRef.current = rect.width;
+      heightRef.current = propHeight || (mode === 'idle' ? 80 : mode === 'recording' ? 200 : 120);
+      canvas.width = widthRef.current * dpr;
+      canvas.height = heightRef.current * dpr;
+      canvas.style.width = `${widthRef.current}px`;
+      canvas.style.height = `${heightRef.current}px`;
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.scale(dpr, dpr);
     };
 
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        if (w > 0) {
-          widthRef.current = w;
-          setupSize(w, propsRef.current.height);
-        }
-      }
-    });
+    resize();
+    const observer = new ResizeObserver(resize);
     observer.observe(container);
 
-    widthRef.current = container.clientWidth || 420;
-    setupSize(widthRef.current, props.height);
-
-    animationRef.current = requestAnimationFrame(animate);
+    // Start animation
+    startTimeRef.current = Date.now();
+    animFrameRef.current = requestAnimationFrame(draw);
 
     return () => {
-      cancelAnimationFrame(animationRef.current);
       observer.disconnect();
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [props.height, animate]);
+  }, [draw, mode, propHeight]);
 
   return (
-    <div ref={containerRef} className="w-full">
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', height: props.height, display: 'block' }}
-      />
+    <div ref={containerRef} style={{ width: '100%', overflow: 'hidden' }}>
+      <canvas ref={canvasRef} style={{ display: 'block', width: '100%' }} />
     </div>
   );
 }

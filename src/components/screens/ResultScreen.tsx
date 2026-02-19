@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { RotateCcw, Sparkles } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
-import { VoiceWaveform } from '@/components/viz/VoiceWaveform';
+import VoiceWaveform from '@/components/viz/VoiceWaveform';
 import { MandalaViz } from '@/components/viz/MandalaViz';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
 import { ChakraBodyMap } from '@/components/viz/ChakraBodyMap';
@@ -80,14 +80,8 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
           <VoiceWaveform
             timeDomainData={profile.frozenWaveform}
             rmsEnergy={profile.voiceProfile.rmsEnergy}
-            fundamental={profile.fundamental}
-            overtoneRichness={profile.richness / 100}
-            jitter={Math.min(profile.voiceProfile.jitter.relative / 2, 1)}
-            shimmer={Math.min(profile.voiceProfile.shimmer.relative / 100, 1)}
             chakraColor={profile.dominantChakra.color}
-            chakraScores={profile.chakraScores}
-            isRecording={false}
-            isResult={true}
+            mode="result"
             height={120}
           />
         </motion.div>

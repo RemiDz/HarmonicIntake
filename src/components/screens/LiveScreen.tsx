@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import type { RealTimeData } from '@/lib/types';
-import { VoiceWaveform } from '@/components/viz/VoiceWaveform';
+import VoiceWaveform from '@/components/viz/VoiceWaveform';
 import { MandalaViz } from '@/components/viz/MandalaViz';
 import { SpectrumBar } from '@/components/viz/SpectrumBar';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
@@ -72,16 +72,8 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
         <VoiceWaveform
           timeDomainData={data.timeDomainData}
           rmsEnergy={data.rmsEnergy}
-          fundamental={data.currentHz}
-          overtoneRichness={data.overtones.length > 0
-            ? data.overtones.reduce((sum, o) => sum + o.amplitude, 0) / data.overtones.length
-            : 0}
-          jitter={Math.min(data.liveJitterRelative / 2, 1)}
-          shimmer={0}
           chakraColor={data.currentChakra?.color || '#4FA8D6'}
-          chakraScores={data.chakraScores}
-          isRecording={true}
-          isResult={false}
+          mode="recording"
           height={200}
         />
 

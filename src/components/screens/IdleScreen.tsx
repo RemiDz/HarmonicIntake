@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Mic } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { VoiceWaveform } from '@/components/viz/VoiceWaveform';
+import VoiceWaveform from '@/components/viz/VoiceWaveform';
 
 interface IdleScreenProps {
   onStart: () => void;
@@ -66,13 +66,8 @@ export function IdleScreen({ onStart, error }: IdleScreenProps) {
           <VoiceWaveform
             timeDomainData={null}
             rmsEnergy={0}
-            fundamental={0}
-            overtoneRichness={0}
-            jitter={0}
-            shimmer={0}
             chakraColor="#4FA8D6"
-            isRecording={false}
-            isResult={false}
+            mode="idle"
             height={80}
           />
         </motion.div>
