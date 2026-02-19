@@ -8,37 +8,24 @@ interface ChakraBodyMapProps {
   scores: ChakraScore[];
 }
 
-// Chakra positions on the body silhouette (y-positions from top to bottom)
-const POSITIONS = [
-  { y: 280, label: 'Root' },
-  { y: 245, label: 'Sacral' },
-  { y: 210, label: 'Solar Plexus' },
-  { y: 170, label: 'Heart' },
-  { y: 135, label: 'Throat' },
-  { y: 100, label: 'Third Eye' },
-  { y: 70, label: 'Crown' },
-];
+const STAGGER = 0.12; // 120ms between each chakra
 
-const STAGGER_DELAY = 0.15; // 150ms between each chakra
-
-/** Counts from 0 to `value` over `duration` ms, starting after `delay` ms */
+/** Counts from 0 → value over 600ms with ease-out, starting after delay ms */
 function CountingScore({ value, delay }: { value: number; delay: number }) {
   const [display, setDisplay] = useState(0);
 
   useEffect(() => {
-    const duration = 800;
+    const duration = 600;
     const timeout = setTimeout(() => {
       const start = performance.now();
       let raf: number;
       const tick = (now: number) => {
         const t = Math.min((now - start) / duration, 1);
-        // ease-out cubic for smooth deceleration
         const eased = 1 - Math.pow(1 - t, 3);
         setDisplay(Math.round(value * eased));
         if (t < 1) raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
-      return () => cancelAnimationFrame(raf);
     }, delay);
     return () => clearTimeout(timeout);
   }, [value, delay]);
@@ -46,107 +33,66 @@ function CountingScore({ value, delay }: { value: number; delay: number }) {
   return <>{display}%</>;
 }
 
-// Spring config that gives a slight overshoot then settle (ease-out-back feel)
-const circleSpring = {
-  type: 'spring' as const,
-  stiffness: 260,
-  damping: 18,
-  mass: 1,
-};
+/** Map score (0-100) to opacity (≈0.4 at 30% → 1.0 at 100%) */
+function scoreToOpacity(score: number): number {
+  return Math.max(0.3, 0.15 + (score / 100) * 0.85);
+}
 
 export function ChakraBodyMap({ scores }: ChakraBodyMapProps) {
-  // Scores are Root→Crown, positions are Root(bottom)→Crown(top) — same order
+  // Display: Crown at top → Root at bottom
+  // Animation: Root (bottom) first → Crown (top) last
+  const reversed = [...scores].map((s, i) => ({ ...s, origIdx: i })).reverse();
 
   return (
-    <div className="flex items-center justify-center" role="img" aria-label="Chakra body map">
-      <svg width="280" height="340" viewBox="0 0 280 340">
-        {/* Subtle body silhouette */}
-        <defs>
-          <linearGradient id="body-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-text-dim)" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="var(--color-text-dim)" stopOpacity="0.05" />
-          </linearGradient>
-        </defs>
+    <div className="relative mx-auto w-fit" role="img" aria-label="Chakra energy centres">
+      {/* Spine line connecting circle centres */}
+      <div
+        className="absolute w-px"
+        style={{
+          left: 'calc(3.5rem + 10px)',
+          top: '14px',
+          bottom: '14px',
+          backgroundColor: 'var(--color-border)',
+          opacity: 0.3,
+        }}
+      />
 
-        {/* Simple body outline — head + torso + center line */}
-        <ellipse cx="140" cy="58" rx="22" ry="26" fill="none" stroke="var(--color-border)" strokeWidth="1" opacity="0.4" />
-        <path
-          d="M 118 80 Q 100 100 95 140 Q 90 200 100 260 Q 110 300 140 310 Q 170 300 180 260 Q 190 200 185 140 Q 180 100 162 80"
-          fill="url(#body-gradient)"
-          stroke="var(--color-border)"
-          strokeWidth="1"
-          opacity="0.3"
-        />
-        {/* Center spine line */}
-        <line x1="140" y1="75" x2="140" y2="295" stroke="var(--color-border)" strokeWidth="1" opacity="0.15" />
-
-        {/* Chakra points */}
-        {scores.map((score, i) => {
-          const pos = POSITIONS[i];
-          if (!pos) return null;
-
-          const radius = 8 + (score.score / 100) * 16; // 8-24px
-          const opacity = 0.3 + (score.score / 100) * 0.7; // 0.3-1.0
-          const glowRadius = radius * 2.5;
-          const delay = i * STAGGER_DELAY;
+      <div className="flex flex-col gap-3 py-1">
+        {reversed.map((score) => {
+          const delay = score.origIdx * STAGGER;
+          const opacity = scoreToOpacity(score.score);
 
           return (
-            <g key={score.name}>
-              {/* Glow — scales up with spring + fades in */}
-              <motion.circle
-                cx={140}
-                cy={pos.y}
-                fill={score.color}
-                initial={{ r: 0, opacity: 0 }}
-                animate={{ r: glowRadius, opacity: opacity * 0.15 }}
-                transition={{
-                  r: { ...circleSpring, delay },
-                  opacity: { duration: 0.6, delay },
-                }}
-              />
-              {/* Main circle — spring scale with overshoot */}
-              <motion.circle
-                cx={140}
-                cy={pos.y}
-                fill={score.color}
-                initial={{ r: 0, opacity: 0 }}
-                animate={{ r: radius, opacity }}
-                transition={{
-                  r: { ...circleSpring, delay },
-                  opacity: { duration: 0.6, delay },
-                }}
-              />
-              {/* Score text — left side (counting number) */}
-              <motion.text
-                x={82}
-                y={pos.y + 4}
-                textAnchor="end"
-                fill="var(--color-text-secondary)"
-                fontSize="10"
-                fontFamily="var(--font-mono)"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3, delay }}
-              >
+            <motion.div
+              key={score.name}
+              className="relative z-10 flex items-center"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: 'easeOut', delay }}
+            >
+              {/* Score — left */}
+              <span className="w-14 pr-3 text-right font-mono text-[11px] text-text-secondary">
                 <CountingScore value={score.score} delay={delay * 1000} />
-              </motion.text>
-              {/* Label — right side */}
-              <motion.text
-                x={198}
-                y={pos.y + 4}
-                fill="var(--color-text-muted)"
-                fontSize="9"
-                fontFamily="var(--font-mono)"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3, delay }}
-              >
-                {pos.label}
-              </motion.text>
-            </g>
+              </span>
+
+              {/* Circle */}
+              <div
+                className="h-5 w-5 flex-shrink-0 rounded-full"
+                style={{
+                  backgroundColor: score.color,
+                  opacity,
+                  boxShadow: `0 0 4px ${score.color}`,
+                }}
+              />
+
+              {/* Name — right */}
+              <span className="pl-3 font-mono text-[10px] text-text-muted">
+                {score.name}
+              </span>
+            </motion.div>
           );
         })}
-      </svg>
+      </div>
     </div>
   );
 }
