@@ -50,8 +50,8 @@ export default function VoiceWaveform({
     const centerY = H / 2;
     const color = chakraColor || '#4FA8D6';
 
-    // Max amplitude = 35% of canvas height
-    const maxAmp = H * 0.35;
+    // Max amplitude = 80% of canvas height (40% each side of center)
+    const maxAmp = H * 0.4;
 
     // Animation speed per mode
     const speed = mode === 'idle' ? 0.3 : mode === 'result' ? 0.05 : 0.8;
@@ -85,8 +85,10 @@ export default function VoiceWaveform({
         const t = i / SEGMENTS;
         const x = t * W;
 
-        // Rule 5: sin(t*PI) envelope — big in middle, zero at edges
-        const envelope = Math.sin(t * Math.PI);
+        // Flat envelope across 80% of width, taper only in first/last 10%
+        let envelope = 1;
+        if (t < 0.1) envelope = t / 0.1;
+        else if (t > 0.9) envelope = (1 - t) / 0.1;
 
         // Primary sine wave
         let y = Math.sin(t * Math.PI * 2 * freq + time * speed * 2 + phase);

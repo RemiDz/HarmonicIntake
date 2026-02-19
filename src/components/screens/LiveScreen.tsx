@@ -3,7 +3,6 @@
 import { motion } from 'framer-motion';
 import type { RealTimeData } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
-import { MandalaViz } from '@/components/viz/MandalaViz';
 import { SpectrumBar } from '@/components/viz/SpectrumBar';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
 import { StabilityMeter } from '@/components/viz/StabilityMeter';
@@ -77,21 +76,12 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
           height={200}
         />
 
-        {/* Mandala with live chakra dots */}
-        <div className="relative">
-          <MandalaViz
-            overtones={data.overtones}
-            fundamental={data.currentHz}
-            chakraColor={data.currentChakra?.color || 'var(--color-accent-primary)'}
-            isAnimating={true}
-          />
-          {/* Live chakra dots on the right side */}
-          {data.chakraScores.length > 0 && (
-            <div className="absolute right-0 top-1/2 -translate-y-1/2">
-              <ChakraLiveDots scores={data.chakraScores} />
-            </div>
-          )}
-        </div>
+        {/* Live chakra dots */}
+        {data.chakraScores.length > 0 && (
+          <div className="flex justify-center">
+            <ChakraLiveDots scores={data.chakraScores} />
+          </div>
+        )}
 
         {/* Frequency + Note */}
         <div className="text-center">

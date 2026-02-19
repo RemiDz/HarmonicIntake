@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { RotateCcw, Sparkles } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
-import { MandalaViz } from '@/components/viz/MandalaViz';
 import { OvertoneChart } from '@/components/viz/OvertoneChart';
 import { ChakraBodyMap } from '@/components/viz/ChakraBodyMap';
 import { ChakraBarChart } from '@/components/viz/ChakraBarChart';
@@ -83,16 +82,6 @@ export function ResultScreen({ profile, onReset }: ResultScreenProps) {
             chakraColor={profile.dominantChakra.color}
             mode="result"
             height={120}
-          />
-        </motion.div>
-
-        {/* Mandala (static) */}
-        <motion.div variants={fadeInUp}>
-          <MandalaViz
-            overtones={profile.overtones}
-            fundamental={profile.fundamental}
-            chakraColor={profile.dominantChakra.color}
-            isAnimating={false}
           />
         </motion.div>
 
