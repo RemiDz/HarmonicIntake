@@ -27,6 +27,8 @@ export function getSpectralCentroid(
   let totalMag = 0;
 
   for (let i = 1; i < frequencyData.length; i++) {
+    // Convert dB to linear AMPLITUDE (10^(dB/20)) — spectral centroid is
+    // conventionally the amplitude-weighted mean of frequency
     const mag = Math.pow(10, frequencyData[i] / 20);
     const freq = i * binRes;
     weightedSum += mag * freq;
@@ -60,10 +62,12 @@ export function getSpectralFlatness(
   let count = 0;
 
   for (let i = startBin; i < endBin; i++) {
-    const mag = Math.pow(10, frequencyData[i] / 20);
-    if (mag <= 0) continue;
-    logSum += Math.log(mag + 1e-10);
-    linSum += mag;
+    // Convert dB to linear POWER (10^(dB/10)) — spectral flatness (Wiener entropy)
+    // is defined on the power spectrum: gm(power) / am(power)
+    const power = Math.pow(10, frequencyData[i] / 10);
+    if (power <= 0) continue;
+    logSum += Math.log(power + 1e-10);
+    linSum += power;
     count++;
   }
 

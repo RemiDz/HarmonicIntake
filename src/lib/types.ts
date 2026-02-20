@@ -57,6 +57,7 @@ export interface VoiceProfile {
     f1: number;          // Hz
     f2: number;          // Hz
     f3: number;          // Hz
+    confidence: number;  // 0-1, how many formants were detected vs defaulted
   };
   spectralCentroid: number; // Hz
   spectralSlope: number;    // dB/Hz

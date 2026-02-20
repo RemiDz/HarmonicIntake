@@ -94,6 +94,43 @@ function getChakraInsight(chakra: string, score: number): string {
 }
 
 /**
+ * Scale formant-dependent weights by detection confidence.
+ * When formants fall back to defaults (confidence < 1), reduce their weight
+ * and redistribute proportionally to non-formant biomarkers.
+ */
+function adjustWeights(
+  weights: [number, number][],
+  formantIndices: number[],
+  confidence: number,
+): [number, number][] {
+  if (confidence >= 1) return weights;
+
+  let lostWeight = 0;
+  const adjusted = weights.map(([value, weight], i) => {
+    if (formantIndices.includes(i)) {
+      const newWeight = weight * confidence;
+      lostWeight += weight - newWeight;
+      return [value, newWeight] as [number, number];
+    }
+    return [value, weight] as [number, number];
+  });
+
+  // Redistribute lost weight proportionally to non-formant entries
+  const nonFormantTotal = adjusted
+    .filter((_, i) => !formantIndices.includes(i))
+    .reduce((sum, [, w]) => sum + w, 0);
+
+  if (nonFormantTotal <= 0) return adjusted;
+
+  return adjusted.map(([value, weight], i) => {
+    if (!formantIndices.includes(i)) {
+      return [value, weight + lostWeight * (weight / nonFormantTotal)] as [number, number];
+    }
+    return [value, weight] as [number, number];
+  });
+}
+
+/**
  * Calculate 7-chakra scores from a VoiceProfile using multi-biomarker
  * weighted composites.
  */
@@ -117,6 +154,9 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
     f1Norm: clamp01((profile.formants.f1 - 200) / 700),
     f2Norm: clamp01((profile.formants.f2 - 800) / 2000),
     f3Norm: clamp01((profile.formants.f3 - 1500) / 2000),
+
+    // Formant detection confidence — used to scale formant weights
+    formantConf: profile.formants.confidence ?? 1,
 
     // Expressiveness
     pitchRangeNorm: clamp01(profile.pitchRange.rangeSemitones / 12), // 0 semitones = 0, 12 = 1
@@ -146,13 +186,14 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
       name: 'Sacral',
       color: '#F0913A',
       // Sacral = flow, emotion, expressiveness
-      score: weightedScore([
+      // f1Norm is at index 2 — scale by formant confidence
+      score: weightedScore(adjustWeights([
         [n.dynamicNorm, 0.30],    // Amplitude expressiveness
         [n.pitchRangeNorm, 0.25], // Pitch expressiveness
         [n.f1Norm, 0.20],         // Open jaw/throat (F1)
         [n.slopeNorm, 0.10],     // Spectral warmth (balanced energy)
         [n.rmsNorm, 0.15],        // Not withdrawn
-      ]),
+      ], [2], n.formantConf)),
       label: '',
       description: '',
     },
@@ -174,14 +215,15 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
       name: 'Heart',
       color: '#5ABF7B',
       // Heart = openness, warmth, expansiveness
-      score: weightedScore([
+      // f1Norm is at index 1 — scale by formant confidence
+      score: weightedScore(adjustWeights([
         [n.slopeNorm, 0.20],      // Balanced spectrum
         [n.f1Norm, 0.20],         // Open throat (F1 height = jaw openness)
         [n.hnrNorm, 0.20],        // Harmonic richness
         [n.dynamicNorm, 0.15],    // Emotional range
         [n.pitchRangeNorm, 0.15], // Vocal warmth & expression
         [n.shimmerNorm, 0.10],    // Steadiness
-      ]),
+      ], [1], n.formantConf)),
       label: '',
       description: '',
     },
@@ -189,14 +231,15 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
       name: 'Throat',
       color: '#4FA8D6',
       // Throat = expression, clarity, truth
-      score: weightedScore([
+      // f2Norm is at index 3 — scale by formant confidence
+      score: weightedScore(adjustWeights([
         [n.hnrNorm, 0.30],        // Voice clarity (primary indicator)
         [n.jitterNorm, 0.20],     // Pitch control
         [n.shimmerNorm, 0.15],    // Amplitude control
         [n.f2Norm, 0.15],         // Oral cavity resonance (articulation)
         [n.rmsNorm, 0.10],        // Projection
         [n.centroidNorm, 0.10],   // Brightness
-      ]),
+      ], [3], n.formantConf)),
       label: '',
       description: '',
     },
@@ -204,14 +247,15 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
       name: 'Third Eye',
       color: '#7B6DB5',
       // Third Eye = brightness, perception, upper frequencies
-      score: weightedScore([
+      // f3Norm is at index 1 — scale by formant confidence
+      score: weightedScore(adjustWeights([
         [n.centroidNorm, 0.30],   // Spectral brightness
         [n.f3Norm, 0.20],         // Upper formant presence
         [n.f0High, 0.15],         // Higher fundamental
         [n.hnrNorm, 0.15],        // Harmonic clarity
         [n.slopeNorm, 0.10],     // Gentle slope (energy in highs)
         [n.jitterNorm, 0.10],     // Precision/control
-      ]),
+      ], [1], n.formantConf)),
       label: '',
       description: '',
     },
@@ -219,14 +263,15 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
       name: 'Crown',
       color: '#C77DBA',
       // Crown = transcendence, overtone richness, harmonic complexity
-      score: weightedScore([
+      // f3Norm is at index 2 — scale by formant confidence
+      score: weightedScore(adjustWeights([
         [n.hnrNorm, 0.25],        // Harmonic richness
         [n.centroidNorm, 0.20],   // Upper frequency energy
         [n.f3Norm, 0.15],         // Highest formant
         [n.slopeNorm, 0.15],     // Gentle slope (energy spreads high)
         [n.f0High, 0.15],         // Higher fundamental
         [n.pitchRangeNorm, 0.10], // Expansive range
-      ]),
+      ], [2], n.formantConf)),
       label: '',
       description: '',
     },
@@ -268,6 +313,8 @@ export function calculateLiveChakraScores(
   let totalEnergy = 0;
 
   for (let i = startBin; i <= endBin && i < frequencyData.length; i++) {
+    // Convert dB to linear POWER (10^(dB/10)) — band energy comparison
+    // requires power summation so ratios reflect true energy distribution
     const power = Math.pow(10, frequencyData[i] / 10);
     linearPower.push(power);
     totalEnergy += power;

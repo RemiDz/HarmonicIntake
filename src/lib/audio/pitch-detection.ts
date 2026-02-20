@@ -2,6 +2,11 @@ const NOISE_THRESHOLD = 0.01;
 const MIN_FREQ = 50;
 const MAX_FREQ = 600;
 
+// Module-level reusable buffers — allocated once, reused every frame
+// to avoid GC pressure from ~60 allocations/second
+let _normalizedBuf: Float32Array | null = null;
+let _autocorrBuf: Float32Array | null = null;
+
 /**
  * Detect the fundamental frequency from a time-domain audio buffer
  * using autocorrelation with parabolic interpolation.
@@ -21,10 +26,12 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number {
   rms = Math.sqrt(rms / n);
   if (rms < NOISE_THRESHOLD) return -1;
 
-  // 2. Normalize the buffer
-  const normalized = new Float32Array(n);
+  // 2. Normalize the buffer (reuse allocated array)
+  if (!_normalizedBuf || _normalizedBuf.length !== n) {
+    _normalizedBuf = new Float32Array(n);
+  }
   for (let i = 0; i < n; i++) {
-    normalized[i] = buffer[i] / rms;
+    _normalizedBuf[i] = buffer[i] / rms;
   }
 
   // 3. Compute autocorrelation
@@ -33,13 +40,19 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number {
   const maxLag = Math.ceil(sampleRate / MIN_FREQ);
   const searchEnd = Math.min(maxLag, Math.floor(n / 2));
 
-  const autocorrelation = new Float32Array(searchEnd + 1);
+  // Reuse autocorrelation buffer
+  const acSize = searchEnd + 1;
+  if (!_autocorrBuf || _autocorrBuf.length < acSize) {
+    _autocorrBuf = new Float32Array(acSize);
+  } else {
+    _autocorrBuf.fill(0, 0, acSize);
+  }
   for (let lag = minLag; lag <= searchEnd; lag++) {
     let sum = 0;
     for (let i = 0; i < n - lag; i++) {
-      sum += normalized[i] * normalized[i + lag];
+      sum += _normalizedBuf[i] * _normalizedBuf[i + lag];
     }
-    autocorrelation[lag] = sum;
+    _autocorrBuf[lag] = sum;
   }
 
   // 4. Find the first dip, then the highest peak after it
@@ -50,14 +63,14 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number {
   for (let lag = minLag; lag <= searchEnd; lag++) {
     if (!foundDip) {
       // Look for the first point where autocorrelation starts increasing
-      if (lag > minLag && autocorrelation[lag] > autocorrelation[lag - 1]) {
+      if (lag > minLag && _autocorrBuf[lag] > _autocorrBuf[lag - 1]) {
         foundDip = true;
       }
       continue;
     }
 
-    if (autocorrelation[lag] > bestVal) {
-      bestVal = autocorrelation[lag];
+    if (_autocorrBuf[lag] > bestVal) {
+      bestVal = _autocorrBuf[lag];
       bestLag = lag;
     }
   }
@@ -70,9 +83,9 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number {
   if (confidence < 0.5) return -1;
 
   // 6. Parabolic interpolation around the peak for sub-sample accuracy
-  const prev = autocorrelation[bestLag - 1] || 0;
-  const curr = autocorrelation[bestLag];
-  const next = autocorrelation[bestLag + 1] || 0;
+  const prev = _autocorrBuf[bestLag - 1] || 0;
+  const curr = _autocorrBuf[bestLag];
+  const next = _autocorrBuf[bestLag + 1] || 0;
 
   const denominator = 2 * (2 * curr - prev - next);
   let interpolatedLag = bestLag;

@@ -35,6 +35,8 @@ export function calculateHNR(
   let totalPower = 0;
 
   for (let i = 1; i < maxBin; i++) {
+    // Convert dB to linear POWER (10^(dB/10)) — HNR is an energy ratio,
+    // so we need additive power quantities (harmonicPower + noisePower = totalPower)
     const power = Math.pow(10, frequencyData[i] / 10);
     totalPower += power;
 

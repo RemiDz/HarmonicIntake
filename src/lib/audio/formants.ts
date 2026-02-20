@@ -19,6 +19,7 @@ export interface FormantResult {
   f1: number; // Hz
   f2: number; // Hz
   f3: number; // Hz
+  confidence: number; // 0, 0.33, 0.67, or 1.0 — how many formants were detected vs defaulted
 }
 
 /**
@@ -85,13 +86,22 @@ export function extractFormants(
 
   // Extract F1, F2, F3 from peaks with overlap prevention.
   // Each subsequent formant must be well above the previous one.
-  const f1 = findPeakInRange(peaks, 200, 900) || 500;
+  // Track how many formants were actually detected vs defaulted.
+  let detectedCount = 0;
+
+  const f1Peak = findPeakInRange(peaks, 200, 900);
+  const f1 = f1Peak || 500;
+  if (f1Peak) detectedCount++;
 
   const f2Floor = Math.max(800, f1 + 200);
-  const f2 = findPeakInRange(peaks, f2Floor, 2800) || 1500;
+  const f2Peak = findPeakInRange(peaks, f2Floor, 2800);
+  const f2 = f2Peak || 1500;
+  if (f2Peak) detectedCount++;
 
   const f3Floor = Math.max(1500, f2 + 300);
-  const f3 = findPeakInRange(peaks, f3Floor, 3500) || 2500;
+  const f3Peak = findPeakInRange(peaks, f3Floor, 3500);
+  const f3 = f3Peak || 2500;
+  if (f3Peak) detectedCount++;
 
-  return { f1, f2, f3 };
+  return { f1, f2, f3, confidence: detectedCount / 3 };
 }

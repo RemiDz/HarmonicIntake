@@ -34,7 +34,8 @@ export function extractOvertones(
 
     const db = freqData[bin];
     const relativeDb = db - fundamentalDb;
-    // Convert relative dB to linear amplitude (0-1)
+    // Convert relative dB to linear AMPLITUDE (10^(dB/20)) — this is a ratio of
+    // harmonic amplitude to fundamental amplitude, displayed as overtone strength 0–1
     const amplitude = Math.max(0, Math.min(1, Math.pow(10, relativeDb / 20)));
 
     overtones.push({

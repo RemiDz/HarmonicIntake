@@ -19,7 +19,7 @@ src/
 │   │   ├── shimmer.ts                  # Cycle-to-cycle amplitude perturbation
 │   │   ├── hnr.ts                      # Harmonic-to-Noise Ratio
 │   │   ├── formants.ts                 # Formant extraction (F1/F2/F3)
-│   │   ├── spectral-features.ts        # Spectral centroid + spectral slope
+│   │   ├── spectral-features.ts        # Spectral centroid, slope + flatness
 │   │   ├── overtone-analysis.ts        # Harmonic overtone extraction (H2–H8)
 │   │   ├── spectrum.ts                 # 64-band spectrum for visualisation
 │   │   └── vocal-qualities.ts          # RMS energy helper
@@ -60,13 +60,13 @@ src/
 ┌──────────────────────┐
 │    AnalyserNode       │  fftSize=4096, smoothingTimeConstant=0.5
 │                       │
-│  getFloatTimeDomain   │──► pitch-detection.ts ──► F0 (Hz)
-│  Data() [4096 float]  │──► glottal-cycles.ts ──► jitter.ts, shimmer.ts
+│  getFloatTimeDomain   │──► pitch-detection.ts ──► F0 (Hz)  [every 2nd frame]
+│  Data() [4096 float]  │──► glottal-cycles.ts (DC blocked) ──► jitter.ts, shimmer.ts
 │                       │──► vocal-qualities.ts ──► RMS energy
 │                       │
 │  getFloatFrequency    │──► overtone-analysis.ts ──► overtones H2-H8
 │  Data() [2048 float]  │──► hnr.ts ──► HNR (dB)
-│         (dB values)   │──► formants.ts ──► F1, F2, F3
+│         (dB values)   │──► formants.ts ──► F1, F2, F3 + confidence
 │                       │──► spectral-features.ts ──► centroid, slope, flatness
 │                       │──► spectrum.ts ──► 64-band viz data
 │                       │──► chakra-scoring.ts (live) ──► 7 band energies
@@ -160,7 +160,8 @@ const frequencyBuffer = new Float32Array(analyser.frequencyBinCount); // 2048 bi
 
 - Duration: **15 seconds** (constant `RECORDING_DURATION = 15`)
 - Loop driven by `requestAnimationFrame` (≈60fps on most devices)
-- Each frame calls all analysis functions and pushes results to accumulator arrays
+- **Frame skipping for CPU efficiency:** Pitch detection and glottal cycle extraction run at **30 Hz** (every 2nd frame) since autocorrelation is the most expensive per-frame operation. FFT-based features (overtones, spectrum, live chakra scores) run every frame (cheap reads from the AnalyserNode).
+- The last valid pitch value (`lastHzRef`) is held between frames so the UI never flashes empty during skipped frames
 - On completion, `buildProfile()` aggregates everything into a `FrequencyProfile`
 - A 1.8-second "analysing" animation plays before showing results
 
@@ -191,12 +192,18 @@ if (rms < NOISE_THRESHOLD) return -1;
 #### Step 2: Normalisation
 
 ```ts
-const normalized = new Float32Array(n);
-for (let i = 0; i < n; i++) normalized[i] = buffer[i] / rms;
+// Module-level reusable buffers — allocated once, reused every frame
+let _normalizedBuf: Float32Array | null = null;
+let _autocorrBuf: Float32Array | null = null;
+
+// Inside detectPitch():
+if (!_normalizedBuf || _normalizedBuf.length !== n) _normalizedBuf = new Float32Array(n);
+for (let i = 0; i < n; i++) _normalizedBuf[i] = buffer[i] / rms;
 ```
 
 - Divides all samples by RMS to normalise amplitude
 - This makes the autocorrelation independent of volume
+- **Reusable buffers:** The `normalized` and `autocorrelation` arrays are allocated at module scope and reused across calls. At 30 Hz (every 2nd frame), this avoids ~30 `Float32Array(4096)` allocations per second that would otherwise pressure the garbage collector
 
 #### Step 3: Autocorrelation Computation
 
@@ -369,15 +376,34 @@ shimmer_dB = (1/(N-1)) × Σ|20×log10(A[i+1] / A[i])|
 
 Both jitter and shimmer depend on glottal cycle detection:
 
-1. **Find positive-going zero crossings** in the time-domain signal (where sample goes from ≤0 to >0)
-2. **Validate period length:** Each crossing pair must have a period within **±30%** of the expected fundamental period:
-   - `minPeriod = expectedPeriod × 0.7`
-   - `maxPeriod = expectedPeriod × 1.4`
-3. **Extract peak amplitude** within each valid cycle (max absolute value between crossings)
+1. **DC blocking filter:** Before zero-crossing detection, the time-domain signal is passed through a first-order DC blocker to remove any DC offset that could shift zero crossings:
 
 ```ts
-for (let i = 1; i < timeDomainData.length; i++) {
-  if (timeDomainData[i - 1] <= 0 && timeDomainData[i] > 0) {
+// y[n] = x[n] - x[n-1] + R × y[n-1]   (R = 0.995)
+let _dcBlockedBuf: Float32Array | null = null;
+// ... reuse buffer ...
+const R = 0.995;
+let xPrev = 0, yPrev = 0;
+for (let i = 0; i < n; i++) {
+  _dcBlockedBuf[i] = timeDomainData[i] - xPrev + R * yPrev;
+  xPrev = timeDomainData[i];
+  yPrev = _dcBlockedBuf[i];
+}
+```
+
+   - R = 0.995 gives a high-pass corner at ~35 Hz (at 44100 Hz sample rate), well below the lowest voice pitch
+   - The DC-blocked buffer is allocated at module scope and reused every call to avoid GC pressure
+   - **Startup transient:** The filter has a brief transient during the first few samples, which can cause peak amplitude overshoot of up to ~6%. This is harmless — it only affects the first cycle or two per frame
+
+2. **Find positive-going zero crossings** in the DC-blocked signal (where sample goes from ≤0 to >0)
+3. **Validate period length:** Each crossing pair must have a period within **±30%** of the expected fundamental period:
+   - `minPeriod = expectedPeriod × 0.7`
+   - `maxPeriod = expectedPeriod × 1.4`
+4. **Extract peak amplitude** within each valid cycle (max absolute value between crossings)
+
+```ts
+for (let i = 1; i < dcBlocked.length; i++) {
+  if (dcBlocked[i - 1] <= 0 && dcBlocked[i] > 0) {
     crossings.push(i);
   }
 }
@@ -431,18 +457,37 @@ for (let i = 1; i < maxBin; i++) {
      - F1: 200–900 Hz (default: 500 Hz)
      - F2: max(800, F1+200) – 2800 Hz (default: 1500 Hz)
      - F3: max(1500, F2+300) – 3500 Hz (default: 2500 Hz)
-- **Output:** Three frequencies in Hz (with hardcoded defaults if no peaks found)
+- **Output:** `FormantResult` — three frequencies in Hz plus a confidence score
 - **Overlap prevention:** Ensures F2 > F1 + 200 Hz and F3 > F2 + 300 Hz, preventing impossible configurations like F2 < F1
+- **Confidence tracking:** Counts how many formants were actually detected vs falling back to defaults:
+  - All 3 detected → confidence = 1.0
+  - 2 detected, 1 default → confidence ≈ 0.67
+  - 1 detected, 2 defaults → confidence ≈ 0.33
+  - All defaults → confidence = 0.0
 - **Typical ranges:** Male F1 270–730 Hz, Female F1 310–850 Hz
 
 ```ts
-const windowBins = Math.max(5, Math.round(fundamental / binRes) * 2);
-// ... smoothing loop ...
-const f1 = findPeakInRange(peaks, 200, 900) || 500;
+interface FormantResult {
+  f1: number; f2: number; f3: number;
+  confidence: number;  // 0–1, detected / total
+}
+
+let detectedCount = 0;
+const f1Peak = findPeakInRange(peaks, 200, 900);
+const f1 = f1Peak || 500;
+if (f1Peak) detectedCount++;
+
 const f2Floor = Math.max(800, f1 + 200);
-const f2 = findPeakInRange(peaks, f2Floor, 2800) || 1500;
+const f2Peak = findPeakInRange(peaks, f2Floor, 2800);
+const f2 = f2Peak || 1500;
+if (f2Peak) detectedCount++;
+
 const f3Floor = Math.max(1500, f2 + 300);
-const f3 = findPeakInRange(peaks, f3Floor, 3500) || 2500;
+const f3Peak = findPeakInRange(peaks, f3Floor, 3500);
+const f3 = f3Peak || 2500;
+if (f3Peak) detectedCount++;
+
+return { f1, f2, f3, confidence: detectedCount / 3 };
 ```
 
 ### 4.7 Spectral Centroid
@@ -480,12 +525,14 @@ slope = (n×Σ(f×dB) - Σf×ΣdB) / (n×Σf² - (Σf)²)
 **Source:** `src/lib/audio/spectral-features.ts` → `getSpectralFlatness()`
 
 - **What it measures:** How "noise-like" vs "tonal" the signal is. Used as a noise gate to reject non-voice frames.
-- **Algorithm:** Ratio of geometric mean to arithmetic mean of linear magnitudes across 60–4000 Hz (Wiener entropy):
+- **Algorithm:** Ratio of geometric mean to arithmetic mean of the **power spectrum** across 60–4000 Hz (Wiener entropy):
 
 ```
-flatness = geometricMean(magnitudes) / arithmeticMean(magnitudes)
+flatness = geometricMean(powers) / arithmeticMean(powers)
+where power[i] = 10^(dB[i] / 10)
 ```
 
+- Uses **power** (10^(dB/10)), not amplitude — standard Wiener entropy is defined on the power spectrum
 - White noise → flatness ≈ 1 (all frequencies equal energy)
 - Tonal signal → flatness ≈ 0 (energy concentrated at harmonics)
 - **Threshold:** Frames with flatness > 0.5 are rejected in `useAudioAnalysis.ts` before pitch is accepted
@@ -628,6 +675,44 @@ Each of the 10 biomarkers is normalised to 0–1:
 | `f0Low` | `1 - (F0 - 60) / 200` | Lower F0 → higher |
 | `f0Mid` | `1 - |F0 - 250| / 200` | Peaks at ~250 Hz |
 | `f0High` | `(F0 - 200) / 400` | Higher F0 → higher |
+| `formantConf` | `formants.confidence` (0–1) | Used to scale formant-dependent weights (see below) |
+
+### Formant Confidence Weight Scaling
+
+**Function:** `adjustWeights(weights, formantIndices, confidence)`
+
+When formant detection falls back to defaults (confidence < 1), formant-dependent biomarkers become unreliable. The `adjustWeights()` helper reduces their weight proportionally and redistributes the lost weight to non-formant biomarkers:
+
+```ts
+function adjustWeights(
+  weights: [number, number][],
+  formantIndices: number[],   // Which entries use formant data
+  confidence: number,          // 0–1 from FormantResult
+): [number, number][] {
+  if (confidence >= 1) return weights;  // All formants detected — no adjustment
+
+  // Scale formant entries by confidence
+  let lostWeight = 0;
+  for each formant entry: newWeight = weight × confidence; lostWeight += original - new
+
+  // Redistribute lost weight proportionally to non-formant entries
+  for each non-formant entry: newWeight += lostWeight × (weight / nonFormantTotal)
+}
+```
+
+**Applied to chakras that use formant data:**
+- Sacral: f1Norm at index 2
+- Heart: f1Norm at index 1
+- Throat: f2Norm at index 3
+- Third Eye: f3Norm at index 1
+- Crown: f3Norm at index 2
+
+Root and Solar Plexus use no formant data — their weights are unaffected.
+
+**Example:** If only 1 of 3 formants is detected (confidence = 0.33):
+- A formant entry with weight 0.20 becomes 0.20 × 0.33 = 0.066
+- The lost 0.134 is distributed proportionally among the other entries
+- Total weights still sum to 1.0
 
 ### Chakra Weighting Profiles
 
@@ -847,11 +932,12 @@ const cents = round((semitones - round(semitones)) × 100);
 - **Zero-crossing method is simplified:** Real glottal pulses are not perfectly symmetrical. Zero crossings may not correspond exactly to glottal opening/closing events.
 - **±30% tolerance is hardcoded:** The `minPeriod = 0.7 × expected` and `maxPeriod = 1.4 × expected` values are reasonable but not tuned to specific voice types.
 - **Dependent on F0 accuracy:** If pitch detection gives a wrong F0, the expected period is wrong, and valid cycles may be rejected.
+- **DC blocker startup transient:** The first-order DC blocker (R=0.995) has a brief transient during the first few samples of each frame, which can cause peak amplitude overshoot of up to ~6%. This only affects 1–2 cycles per frame out of hundreds accumulated over 15 seconds, so the impact on jitter/shimmer statistics is negligible.
 
 ### Formant Extraction
 
 - **Not LPC:** The moving-average smoothing + peak picking method is a simplification. True formant analysis typically uses Linear Predictive Coding (LPC), which models the vocal tract transfer function.
-- **Hardcoded defaults:** If no peaks are found, F1=500, F2=1500, F3=2500 are returned. These defaults are used in chakra scoring and could skew results if formant detection consistently fails.
+- **Hardcoded defaults with confidence tracking:** If no peaks are found, F1=500, F2=1500, F3=2500 are returned. However, the `confidence` field (0–1) tracks how many formants were actually detected vs defaulted. Chakra scoring uses `adjustWeights()` to reduce the influence of defaulted formants, so the impact of inaccurate defaults is mitigated rather than silently corrupting scores.
 - **Smoothing window depends on F0:** If F0 is wrong, the smoothing window is wrong, and formant peaks may not be properly resolved.
 
 ### HNR Calculation
@@ -889,6 +975,38 @@ const cents = round((semitones - round(semitones)) × 100);
 
 ---
 
+## 8. dB-to-Linear Conversion Conventions
+
+The Web Audio API's `getFloatFrequencyData()` returns values in dB. Different analysis functions convert these to linear scale using one of two formulas, depending on the physical quantity being computed:
+
+### Power: `10^(dB/10)` — for energy ratios and additive quantities
+
+Used when values need to be **summed** and compared as energy (power is additive):
+
+| File | Function | Why power |
+|------|----------|-----------|
+| `hnr.ts` | `calculateHNR()` | HNR is a ratio of harmonic energy to noise energy — requires additive power sums |
+| `chakra-scoring.ts` | `calculateLiveChakraScores()` | Band energy comparison — summing power in each chakra's frequency band |
+| `spectral-features.ts` | `getSpectralFlatness()` | Wiener entropy is defined as geometric/arithmetic mean of the power spectrum |
+
+### Amplitude: `10^(dB/20)` — for magnitude weights
+
+Used when values serve as **weights** for weighted averages (amplitude is proportional to signal magnitude):
+
+| File | Function | Why amplitude |
+|------|----------|---------------|
+| `spectral-features.ts` | `getSpectralCentroid()` | Spectral centroid is conventionally the amplitude-weighted mean of frequency |
+| `overtone-analysis.ts` | `calculateRichness()` | Overtone strength is a ratio of harmonic amplitude to fundamental amplitude (displayed as 0–1) |
+
+### Rule of thumb
+
+- **"How much energy is in this band?"** → Power (÷10)
+- **"How strong is this frequency component?"** → Amplitude (÷20)
+
+Each conversion has an inline comment in the source code explaining the choice.
+
+---
+
 ## Appendix: Type Definitions
 
 ### VoiceProfile (10 biomarkers + metadata)
@@ -899,7 +1017,7 @@ interface VoiceProfile {
   jitter: { absolute: number; relative: number; rap: number };
   shimmer: { db: number; relative: number; apq3: number };
   hnr: number;
-  formants: { f1: number; f2: number; f3: number };
+  formants: { f1: number; f2: number; f3: number; confidence: number };
   spectralCentroid: number;
   spectralSlope: number;
   rmsEnergy: number;
@@ -908,6 +1026,8 @@ interface VoiceProfile {
   cycleCount: number;
 }
 ```
+
+- `formants.confidence`: 0–1, fraction of formants detected by peak-picking vs falling back to defaults (0, 0.33, 0.67, or 1.0). Used by `adjustWeights()` in chakra scoring to reduce the influence of unreliable formant data.
 
 ### FrequencyProfile (final output)
 

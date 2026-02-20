@@ -66,6 +66,8 @@ export function useAudioAnalysis() {
   const rmsHistoryRef = useRef<number[]>([]);
   const frozenWaveformRef = useRef<Float32Array | null>(null);
   const recentF0sRef = useRef<number[]>([]);
+  const frameCountRef = useRef(0);
+  const lastHzRef = useRef(-1);
 
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -124,41 +126,56 @@ export function useAudioAnalysis() {
     // Extract audio data
     const timeDomain = recorder.getTimeDomainData();
     const freqDomain = recorder.getFrequencyData();
+    frameCountRef.current++;
 
-    // Pitch detection with spectral flatness gate and octave error rejection
-    let hz = detectPitch(timeDomain, recorder.sampleRate);
+    // RMS energy (cheap — every frame)
+    const rms = getRMSEnergy(timeDomain);
+    rmsHistoryRef.current.push(rms);
 
-    // Reject noise-like signals via spectral flatness (white noise ≈ 1, tonal ≈ 0)
-    if (hz > 0) {
-      const flatness = getSpectralFlatness(freqDomain, recorder.sampleRate, recorder.analyser.fftSize);
-      if (flatness > 0.5) hz = -1;
-    }
+    // Pitch detection + glottal cycles — every 2nd frame (~30Hz) to reduce CPU load.
+    // Autocorrelation is ~200M multiply-add ops/sec at 60fps; halving saves ~50% CPU.
+    // 450 readings over 15s at 30Hz is more than sufficient for accurate results.
+    let hz = lastHzRef.current;
+    const runPitchFrame = frameCountRef.current % 2 === 0;
 
-    // Reject octave errors: if hz suddenly jumps to ~2× or ~0.5× the running median, discard it
-    if (hz > 0 && recentF0sRef.current.length >= 5) {
-      const median = getMedian(recentF0sRef.current);
-      if (median > 0) {
-        const ratio = hz / median;
-        if (ratio > 1.8 && ratio < 2.2) hz = -1; // likely octave-up error
-        if (ratio > 0.4 && ratio < 0.6) hz = -1; // likely octave-down error
+    if (runPitchFrame) {
+      hz = detectPitch(timeDomain, recorder.sampleRate);
+
+      // Reject noise-like signals via spectral flatness (white noise ≈ 1, tonal ≈ 0)
+      if (hz > 0) {
+        const flatness = getSpectralFlatness(freqDomain, recorder.sampleRate, recorder.analyser.fftSize);
+        if (flatness > 0.5) hz = -1;
+      }
+
+      // Reject octave errors: if hz suddenly jumps to ~2× or ~0.5× the running median, discard it
+      if (hz > 0 && recentF0sRef.current.length >= 5) {
+        const median = getMedian(recentF0sRef.current);
+        if (median > 0) {
+          const ratio = hz / median;
+          if (ratio > 1.8 && ratio < 2.2) hz = -1; // likely octave-up error
+          if (ratio > 0.4 && ratio < 0.6) hz = -1; // likely octave-down error
+        }
+      }
+      if (hz > 0) {
+        recentF0sRef.current.push(hz);
+        if (recentF0sRef.current.length > 10) recentF0sRef.current.shift();
+      }
+
+      lastHzRef.current = hz;
+      readingsRef.current.push(hz);
+
+      // Glottal cycles for jitter/shimmer (depends on pitch, so also every 2nd frame)
+      if (hz > 0) {
+        const cycles = extractGlottalCycles(timeDomain, recorder.sampleRate, hz);
+        allCyclesRef.current.push(...cycles);
       }
     }
-    if (hz > 0) {
-      recentF0sRef.current.push(hz);
-      if (recentF0sRef.current.length > 10) recentF0sRef.current.shift();
-    }
-
-    readingsRef.current.push(hz);
 
     // Store frequency data snapshot (copy since the buffer is reused)
     const freqCopy = new Float32Array(freqDomain);
     frequencyDataSnapshotsRef.current.push(freqCopy);
 
-    // RMS energy
-    const rms = getRMSEnergy(timeDomain);
-    rmsHistoryRef.current.push(rms);
-
-    // Overtones and glottal cycles (only if we have a valid pitch)
+    // FFT-based features — every frame (cheap, just array lookups)
     let overtones: Overtone[] = [];
     let liveHnr = 0;
     let liveJitterRelative = 0;
@@ -166,10 +183,6 @@ export function useAudioAnalysis() {
     if (hz > 0) {
       overtones = extractOvertones(freqDomain, hz, recorder.sampleRate, recorder.analyser.fftSize);
       overtoneSnapshotsRef.current.push(overtones);
-
-      // Extract glottal cycles for jitter/shimmer
-      const cycles = extractGlottalCycles(timeDomain, recorder.sampleRate, hz);
-      allCyclesRef.current.push(...cycles);
 
       // Live HNR
       liveHnr = calculateHNR(freqDomain, hz, recorder.sampleRate, recorder.analyser.fftSize);
@@ -244,6 +257,8 @@ export function useAudioAnalysis() {
       lastValidChakraRef.current = null;
       lastValidOvertonesRef.current = [];
       recentF0sRef.current = [];
+      frameCountRef.current = 0;
+      lastHzRef.current = -1;
 
       const recorder = await startRecording();
       recorderRef.current = recorder;

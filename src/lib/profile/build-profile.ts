@@ -173,7 +173,7 @@ function buildVoiceProfile(data: RecordingData): VoiceProfile {
   const formants =
     avgFreqData.length > 0 && meanF0 > 0
       ? extractFormants(avgFreqData, sampleRate, fftSize, meanF0)
-      : { f1: 500, f2: 1500, f3: 2500 };
+      : { f1: 500, f2: 1500, f3: 2500, confidence: 0 };
   const spectralCentroid =
     avgFreqData.length > 0 ? getSpectralCentroid(avgFreqData, sampleRate, fftSize) : 0;
   const spectralSlope =
@@ -201,6 +201,7 @@ function buildVoiceProfile(data: RecordingData): VoiceProfile {
       f1: Math.round(formants.f1),
       f2: Math.round(formants.f2),
       f3: Math.round(formants.f3),
+      confidence: Math.round(formants.confidence * 100) / 100,
     },
     spectralCentroid: Math.round(spectralCentroid),
     spectralSlope: Math.round(spectralSlope * 10000) / 10000,
