@@ -64,7 +64,12 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number {
 
   if (bestLag === -1) return -1;
 
-  // 5. Parabolic interpolation around the peak for sub-sample accuracy
+  // 5. Confidence check: compare peak autocorrelation to zero-lag energy
+  // Zero-lag of normalized buffer = n, so confidence = bestVal / n
+  const confidence = bestVal / n;
+  if (confidence < 0.5) return -1;
+
+  // 6. Parabolic interpolation around the peak for sub-sample accuracy
   const prev = autocorrelation[bestLag - 1] || 0;
   const curr = autocorrelation[bestLag];
   const next = autocorrelation[bestLag + 1] || 0;
@@ -75,10 +80,10 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number {
     interpolatedLag = bestLag + (prev - next) / denominator;
   }
 
-  // 6. Convert lag to frequency
+  // 7. Convert lag to frequency
   const freq = sampleRate / interpolatedLag;
 
-  // 7. Final range check
+  // 8. Final range check
   if (freq < MIN_FREQ || freq > MAX_FREQ) return -1;
 
   return freq;

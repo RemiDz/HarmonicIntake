@@ -1,5 +1,5 @@
 const FFT_SIZE = 4096;
-const SMOOTHING = 0.85;
+const SMOOTHING = 0.5;
 
 export interface AudioRecorderHandle {
   analyser: AnalyserNode;
@@ -14,7 +14,14 @@ export interface AudioRecorderHandle {
  * Returns a handle with methods to extract audio data and stop recording.
  */
 export async function startRecording(): Promise<AudioRecorderHandle> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      sampleRate: { ideal: 44100 },
+    },
+  });
   const ctx = new AudioContext();
   const source = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();

@@ -15,10 +15,19 @@ import { buildProfile } from '@/lib/profile/build-profile';
 import { startRecording, type AudioRecorderHandle } from '@/lib/audio/recorder';
 import { getRMSEnergy } from '@/lib/audio/vocal-qualities';
 import { calculateLiveChakraScores } from '@/lib/scoring/chakra-scoring';
+import { getSpectralFlatness } from '@/lib/audio/spectral-features';
 import { playTing, playChord, hapticBuzz, hapticDoubleBuzz } from '@/lib/audio/ui-sounds';
 
 const RECORDING_DURATION = 15;
 const STABILITY_WINDOW = 30;
+
+/** Get median from array of numbers */
+function getMedian(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
 
 const EMPTY_REALTIME: RealTimeData = {
   currentHz: 0,
@@ -56,6 +65,7 @@ export function useAudioAnalysis() {
   const allCyclesRef = useRef<GlottalCycle[]>([]);
   const rmsHistoryRef = useRef<number[]>([]);
   const frozenWaveformRef = useRef<Float32Array | null>(null);
+  const recentF0sRef = useRef<number[]>([]);
 
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -115,8 +125,29 @@ export function useAudioAnalysis() {
     const timeDomain = recorder.getTimeDomainData();
     const freqDomain = recorder.getFrequencyData();
 
-    // Pitch detection
-    const hz = detectPitch(timeDomain, recorder.sampleRate);
+    // Pitch detection with spectral flatness gate and octave error rejection
+    let hz = detectPitch(timeDomain, recorder.sampleRate);
+
+    // Reject noise-like signals via spectral flatness (white noise ≈ 1, tonal ≈ 0)
+    if (hz > 0) {
+      const flatness = getSpectralFlatness(freqDomain, recorder.sampleRate, recorder.analyser.fftSize);
+      if (flatness > 0.5) hz = -1;
+    }
+
+    // Reject octave errors: if hz suddenly jumps to ~2× or ~0.5× the running median, discard it
+    if (hz > 0 && recentF0sRef.current.length >= 5) {
+      const median = getMedian(recentF0sRef.current);
+      if (median > 0) {
+        const ratio = hz / median;
+        if (ratio > 1.8 && ratio < 2.2) hz = -1; // likely octave-up error
+        if (ratio > 0.4 && ratio < 0.6) hz = -1; // likely octave-down error
+      }
+    }
+    if (hz > 0) {
+      recentF0sRef.current.push(hz);
+      if (recentF0sRef.current.length > 10) recentF0sRef.current.shift();
+    }
+
     readingsRef.current.push(hz);
 
     // Store frequency data snapshot (copy since the buffer is reused)
@@ -212,6 +243,7 @@ export function useAudioAnalysis() {
       lastValidNoteRef.current = null;
       lastValidChakraRef.current = null;
       lastValidOvertonesRef.current = [];
+      recentF0sRef.current = [];
 
       const recorder = await startRecording();
       recorderRef.current = recorder;

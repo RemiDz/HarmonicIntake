@@ -52,8 +52,8 @@ function getQualityPositions(profile: FrequencyProfile) {
   const vp = profile.voiceProfile;
   return {
     steadiness: Math.max(0, Math.min(100, (1 - vp.jitter.relative / 2) * 100)),
-    projection: Math.max(0, Math.min(100, (vp.rmsEnergy / 0.15) * 100)),
-    clarity: Math.max(0, Math.min(100, ((vp.hnr - 5) / 30) * 100)),
+    projection: Math.max(0, Math.min(100, ((vp.rmsEnergy - 0.01) / 0.12) * 100)),
+    clarity: Math.max(0, Math.min(100, ((vp.hnr - 5) / 40) * 100)),
     expressiveness: Math.max(0, Math.min(100, (vp.pitchRange.rangeSemitones / 12) * 100)),
     warmth: Math.max(0, Math.min(100, (Math.abs(vp.spectralSlope) / 0.01) * 100)),
   };

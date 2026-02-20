@@ -43,13 +43,13 @@ describe('calculateHNR', () => {
     expect(hnr).toBeLessThan(20);
   });
 
-  it('caps at 40 dB maximum', () => {
+  it('caps at 50 dB maximum', () => {
     // Create extremely harmonic signal with zero noise
     const data = new Float32Array(binCount).fill(-200);
     const bin = Math.round(220 / binRes);
     data[bin] = 0;
     const hnr = calculateHNR(data, 220, sampleRate, fftSize);
-    expect(hnr).toBeLessThanOrEqual(40);
+    expect(hnr).toBeLessThanOrEqual(50);
   });
 
   it('works for typical male voice (130 Hz)', () => {

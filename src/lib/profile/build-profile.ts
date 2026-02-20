@@ -14,7 +14,7 @@ import { calculateChakraScores } from '@/lib/scoring/chakra-scoring';
 /**
  * Calculate tonal stability from a buffer of frequency readings.
  * Uses coefficient of variation (CV = stddev / mean).
- * Stability = clamp(1 - CV * 10, 0, 1).
+ * Stability = clamp(1 - CV * 5, 0, 1).
  */
 export function calculateStability(readings: number[]): number {
   const valid = readings.filter((r) => r > 0);
@@ -27,7 +27,7 @@ export function calculateStability(readings: number[]): number {
   const stddev = Math.sqrt(variance);
   const cv = stddev / mean;
 
-  return Math.max(0, Math.min(1, 1 - cv * 10));
+  return Math.max(0, Math.min(1, 1 - cv * 5));
 }
 
 /**
@@ -181,7 +181,7 @@ function buildVoiceProfile(data: RecordingData): VoiceProfile {
 
   const rmsEnergy =
     rmsHistory.length > 0
-      ? Math.min(1, (rmsHistory.reduce((a, b) => a + b, 0) / rmsHistory.length) * 10)
+      ? Math.min(1, rmsHistory.reduce((a, b) => a + b, 0) / rmsHistory.length)
       : 0;
 
   const dynamicRange = getDynamicRange(rmsHistory);

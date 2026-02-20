@@ -18,7 +18,7 @@
  * @param fundamental - Detected fundamental frequency in Hz
  * @param sampleRate - AudioContext sample rate
  * @param fftSize - AnalyserNode FFT size
- * @returns HNR in dB (capped at 40 dB)
+ * @returns HNR in dB (capped at 50 dB)
  */
 export function calculateHNR(
   frequencyData: Float32Array,
@@ -38,12 +38,13 @@ export function calculateHNR(
     const power = Math.pow(10, frequencyData[i] / 10);
     totalPower += power;
 
-    // Check if this bin is near a harmonic (within ±1 bin)
+    // Check if this bin is near a harmonic (tolerance scales with harmonic number)
     const freq = i * binRes;
     for (let h = 1; h <= 12; h++) {
       const harmonicFreq = fundamental * h;
       if (harmonicFreq > 4000) break;
-      if (Math.abs(freq - harmonicFreq) <= binRes) {
+      const tolerance = Math.max(1, Math.round(h * 0.5));
+      if (Math.abs(freq - harmonicFreq) <= binRes * tolerance) {
         harmonicPower += power;
         break;
       }
@@ -51,6 +52,6 @@ export function calculateHNR(
   }
 
   const noisePower = totalPower - harmonicPower;
-  if (noisePower <= 0) return 40; // Cap at 40 dB
-  return Math.min(40, 10 * Math.log10(harmonicPower / noisePower));
+  if (noisePower <= 0) return 50; // Cap at 50 dB
+  return Math.min(50, 10 * Math.log10(harmonicPower / noisePower));
 }

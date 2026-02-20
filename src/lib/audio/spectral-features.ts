@@ -37,6 +37,45 @@ export function getSpectralCentroid(
 }
 
 /**
+ * Calculate spectral flatness (Wiener entropy).
+ * Ratio of geometric mean to arithmetic mean of the power spectrum.
+ * White noise → flatness ≈ 1, tonal signal → flatness ≈ 0.
+ *
+ * @param frequencyData - Float32Array from getFloatFrequencyData() (dB values)
+ * @param sampleRate - AudioContext sample rate
+ * @param fftSize - AnalyserNode FFT size
+ * @returns Spectral flatness in range [0, 1]
+ */
+export function getSpectralFlatness(
+  frequencyData: Float32Array,
+  sampleRate: number,
+  fftSize: number,
+): number {
+  const binRes = sampleRate / fftSize;
+  const startBin = Math.ceil(60 / binRes);
+  const endBin = Math.min(frequencyData.length, Math.ceil(4000 / binRes));
+
+  let logSum = 0;
+  let linSum = 0;
+  let count = 0;
+
+  for (let i = startBin; i < endBin; i++) {
+    const mag = Math.pow(10, frequencyData[i] / 20);
+    if (mag <= 0) continue;
+    logSum += Math.log(mag + 1e-10);
+    linSum += mag;
+    count++;
+  }
+
+  if (count === 0 || linSum === 0) return 1;
+
+  const geometricMean = Math.exp(logSum / count);
+  const arithmeticMean = linSum / count;
+
+  return geometricMean / (arithmeticMean + 1e-10);
+}
+
+/**
  * Calculate the spectral slope (dB/Hz) via linear regression over 60-4000 Hz.
  * Negative = steep rolloff (warm). Closer to 0 = flat (bright).
  *

@@ -83,10 +83,15 @@ export function extractFormants(
   // Sort by amplitude descending (strongest peaks are most likely formants)
   peaks.sort((a, b) => b.amp - a.amp);
 
-  // Extract F1, F2, F3 from peaks in expected ranges (with defaults)
+  // Extract F1, F2, F3 from peaks with overlap prevention.
+  // Each subsequent formant must be well above the previous one.
   const f1 = findPeakInRange(peaks, 200, 900) || 500;
-  const f2 = findPeakInRange(peaks, 800, 2800) || 1500;
-  const f3 = findPeakInRange(peaks, 1500, 3500) || 2500;
+
+  const f2Floor = Math.max(800, f1 + 200);
+  const f2 = findPeakInRange(peaks, f2Floor, 2800) || 1500;
+
+  const f3Floor = Math.max(1500, f2 + 300);
+  const f3 = findPeakInRange(peaks, f3Floor, 3500) || 2500;
 
   return { f1, f2, f3 };
 }

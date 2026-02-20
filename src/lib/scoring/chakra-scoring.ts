@@ -103,10 +103,10 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
     // Stability metrics (inverted — lower jitter = more stable)
     jitterNorm: clamp01(1 - profile.jitter.relative / 2),       // 0% = 1.0, 2% = 0.0
     shimmerNorm: clamp01(1 - profile.shimmer.db / 0.8),          // 0dB = 1.0, 0.8dB = 0.0
-    hnrNorm: clamp01((profile.hnr - 5) / 30),                    // 5dB = 0.0, 35dB = 1.0
+    hnrNorm: clamp01((profile.hnr - 5) / 40),                    // 5dB = 0.0, 45dB = 1.0
 
     // Energy & projection
-    rmsNorm: clamp01(profile.rmsEnergy / 0.15),                  // Scale to typical hum range
+    rmsNorm: clamp01((profile.rmsEnergy - 0.01) / 0.12),          // Typical speaking voice RMS: 0.02-0.15
     dynamicNorm: clamp01(profile.dynamicRange),
 
     // Spectral character
@@ -149,8 +149,8 @@ export function calculateChakraScores(profile: VoiceProfile): ChakraScore[] {
       score: weightedScore([
         [n.dynamicNorm, 0.30],    // Amplitude expressiveness
         [n.pitchRangeNorm, 0.25], // Pitch expressiveness
-        [n.f1Norm, 0.15],         // Open jaw/throat (F1)
-        [1 - n.jitterNorm, 0.15], // Some natural variation (not rigid)
+        [n.f1Norm, 0.20],         // Open jaw/throat (F1)
+        [n.slopeNorm, 0.10],     // Spectral warmth (balanced energy)
         [n.rmsNorm, 0.15],        // Not withdrawn
       ]),
       label: '',
