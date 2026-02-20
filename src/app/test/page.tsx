@@ -4,6 +4,8 @@ import { useState, useCallback, useRef } from 'react';
 import { detectPitch } from '@/lib/audio/pitch-detection';
 import { getSpectralFlatness } from '@/lib/audio/spectral-features';
 import { calculateHNR } from '@/lib/audio/hnr';
+import { extractGlottalCycles } from '@/lib/audio/glottal-cycles';
+import { calculateJitter } from '@/lib/audio/jitter';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -311,6 +313,156 @@ async function runNoiseRejectionTest(): Promise<TestResult> {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Test C2: DC Blocker                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Glottal cycle extraction WITHOUT DC blocker — identical logic to
+ * extractGlottalCycles but operates directly on raw samples.
+ */
+function extractCyclesNoDcBlocker(
+  timeDomainData: Float32Array,
+  sampleRate: number,
+  fundamental: number,
+): { count: number; periods: number[] } {
+  if (fundamental <= 0) return { count: 0, periods: [] };
+
+  const n = timeDomainData.length;
+  const expectedPeriod = sampleRate / fundamental;
+  const minPeriod = expectedPeriod * 0.7;
+  const maxPeriod = expectedPeriod * 1.4;
+
+  // Find positive-going zero crossings on RAW signal (no DC blocker)
+  const crossings: number[] = [];
+  for (let i = 1; i < n; i++) {
+    if (timeDomainData[i - 1] <= 0 && timeDomainData[i] > 0) {
+      crossings.push(i);
+    }
+  }
+
+  const periods: number[] = [];
+  for (let i = 0; i < crossings.length - 1; i++) {
+    const p = crossings[i + 1] - crossings[i];
+    if (p >= minPeriod && p <= maxPeriod) {
+      periods.push(p / sampleRate);
+    }
+  }
+
+  return { count: periods.length, periods };
+}
+
+async function runDcBlockerTest(): Promise<TestResult> {
+  const log: string[] = [];
+  const ctx = new AudioContext();
+  const { analyser, signalGain } = buildPipeline(ctx);
+
+  // Create 200 Hz oscillator at gain 0.15
+  const osc = ctx.createOscillator();
+  osc.frequency.value = 200;
+  const oscGain = ctx.createGain();
+  oscGain.gain.value = 0.15;
+  osc.connect(oscGain);
+
+  // ScriptProcessorNode to add DC offset of +0.1 to every sample
+  const bufSize = 4096;
+  const dcInjector = ctx.createScriptProcessor(bufSize, 1, 1);
+  dcInjector.onaudioprocess = (e) => {
+    const input = e.inputBuffer.getChannelData(0);
+    const output = e.outputBuffer.getChannelData(0);
+    for (let i = 0; i < input.length; i++) {
+      output[i] = input[i] + 0.1;
+    }
+  };
+
+  oscGain.connect(dcInjector);
+  dcInjector.connect(signalGain);
+  osc.start();
+
+  const timeDomain = new Float32Array(analyser.fftSize);
+
+  log.push(`Sample rate: ${ctx.sampleRate} Hz`);
+  log.push(`Signal: 200 Hz sine @ gain=0.15 + DC offset=+0.1`);
+  log.push('Waiting 1s for stabilisation...');
+  await wait(1000);
+
+  // Collect multiple frames over ~2s
+  const withDcBlockerCycles: number[] = [];
+  const withDcBlockerPeriods: number[] = [];
+  const noDcBlockerCycles: number[] = [];
+  const noDcBlockerPeriods: number[] = [];
+
+  const collectEnd = performance.now() + 2000;
+  log.push('Collecting glottal cycles for 2s...');
+
+  await new Promise<void>((resolve) => {
+    function frame() {
+      if (performance.now() >= collectEnd) {
+        resolve();
+        return;
+      }
+      analyser.getFloatTimeDomainData(timeDomain);
+
+      // With DC blocker (production function)
+      const cyclesWith = extractGlottalCycles(timeDomain, ctx.sampleRate, 200);
+      withDcBlockerCycles.push(cyclesWith.length);
+      for (const c of cyclesWith) withDcBlockerPeriods.push(c.periodSeconds);
+
+      // Without DC blocker (raw signal)
+      const rawResult = extractCyclesNoDcBlocker(timeDomain, ctx.sampleRate, 200);
+      noDcBlockerCycles.push(rawResult.count);
+      for (const p of rawResult.periods) noDcBlockerPeriods.push(p);
+
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
+
+  osc.stop();
+  dcInjector.disconnect();
+  await ctx.close();
+
+  const withTotal = withDcBlockerCycles.reduce((a, b) => a + b, 0);
+  const withoutTotal = noDcBlockerCycles.reduce((a, b) => a + b, 0);
+
+  const withJitter = calculateJitter(withDcBlockerPeriods);
+  const withoutJitter = calculateJitter(noDcBlockerPeriods);
+
+  log.push(`--- WITH DC blocker ---`);
+  log.push(`Valid cycles: ${withTotal}`);
+  log.push(`Jitter (relative): ${withJitter.relative.toFixed(4)}%`);
+  log.push(`Periods collected: ${withDcBlockerPeriods.length}`);
+
+  log.push(`--- WITHOUT DC blocker ---`);
+  log.push(`Valid cycles: ${withoutTotal}`);
+  log.push(`Jitter (relative): ${withoutJitter.relative.toFixed(4)}%`);
+  log.push(`Periods collected: ${noDcBlockerPeriods.length}`);
+
+  const moreCycles = withTotal > withoutTotal;
+  const lowerJitter = withJitter.relative < withoutJitter.relative;
+  const pass = moreCycles && lowerJitter;
+
+  if (!pass) {
+    if (!moreCycles)
+      log.push(`FAIL: DC blocker cycles (${withTotal}) <= raw cycles (${withoutTotal})`);
+    if (!lowerJitter)
+      log.push(
+        `FAIL: DC blocker jitter (${withJitter.relative.toFixed(4)}%) >= raw jitter (${withoutJitter.relative.toFixed(4)}%)`,
+      );
+  }
+
+  return {
+    status: pass ? 'pass' : 'fail',
+    metrics: {
+      'Cycles (DC)': `${withTotal}`,
+      'Cycles (raw)': `${withoutTotal}`,
+      'Jitter (DC)': `${withJitter.relative.toFixed(4)}%`,
+      'Jitter (raw)': `${withoutJitter.relative.toFixed(4)}%`,
+    },
+    log,
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /*  Status badge                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -464,6 +616,7 @@ export default function TestPage() {
   const [running, setRunning] = useState(false);
   const [a1, setA1] = useState<TestResult>(EMPTY);
   const [b1, setB1] = useState<TestResult>(EMPTY);
+  const [c2, setC2] = useState<TestResult>(EMPTY);
   const [d1, setD1] = useState<TestResult>(EMPTY);
   const abortRef = useRef(false);
 
@@ -472,6 +625,7 @@ export default function TestPage() {
     abortRef.current = false;
     setA1(EMPTY);
     setB1(EMPTY);
+    setC2(EMPTY);
     setD1(EMPTY);
 
     // A1
@@ -492,6 +646,17 @@ export default function TestPage() {
       setB1(r);
     } catch (e) {
       setB1({ status: 'fail', metrics: {}, log: [`Error: ${e}`] });
+    }
+
+    if (abortRef.current) { setRunning(false); return; }
+
+    // C2
+    setC2(RUNNING);
+    try {
+      const r = await runDcBlockerTest();
+      setC2(r);
+    } catch (e) {
+      setC2({ status: 'fail', metrics: {}, log: [`Error: ${e}`] });
     }
 
     if (abortRef.current) { setRunning(false); return; }
@@ -569,6 +734,7 @@ export default function TestPage() {
         {/* Test cards */}
         <TestCard title="A1: dB Semantics" subtitle="Amplitude doubling → expected +6 dB (magnitude)" result={a1} />
         <TestCard title="B1: Pitch Accuracy" subtitle="220 Hz oscillator → detectPitch accuracy" result={b1} />
+        <TestCard title="C2: DC Blocker" subtitle="DC offset signal → blocker should improve cycle detection" result={c2} />
         <TestCard title="D1: Noise Rejection" subtitle="White noise → pitch should be rejected" result={d1} />
 
         {/* Footer */}
