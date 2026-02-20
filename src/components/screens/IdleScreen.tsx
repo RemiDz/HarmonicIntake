@@ -142,6 +142,13 @@ export function IdleScreen({ onStart, error }: IdleScreenProps) {
         <motion.p variants={fadeInUp} className="text-xs text-text-dim">
           No data stored · Works entirely in your browser
         </motion.p>
+
+        <motion.p
+          variants={fadeInUp}
+          className="mt-8 font-mono text-[12px] text-text-primary opacity-40"
+        >
+          Built by Remigijus Dzingelevi&#269;ius
+        </motion.p>
       </div>
     </motion.div>
   );

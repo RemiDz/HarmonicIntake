@@ -495,9 +495,16 @@ export function ResultScreen({ profile, onReset, onCompare }: ResultScreenProps)
         {/* ── Footer ── */}
         <motion.p
           variants={fadeInUp}
-          className="pb-8 text-center text-[10px] tracking-wider text-text-dim uppercase"
+          className="text-center text-[10px] tracking-wider text-text-dim uppercase"
         >
           Harmonic Intake · No data stored · Browser only
+        </motion.p>
+
+        <motion.p
+          variants={fadeInUp}
+          className="pb-8 pt-6 text-center font-mono text-[12px] text-text-primary opacity-40"
+        >
+          Built by Remigijus Dzingelevi&#269;ius
         </motion.p>
       </div>
     </motion.div>
