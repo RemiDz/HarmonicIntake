@@ -414,25 +414,40 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
         useCORS: true,
         logging: false
       }).then(function(canvas) {
-        canvas.toBlob(function(blob) {
-          var d = new Date();
-          var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'harmonic-intake-report-' + ds + '.png';
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(a.href);
-          btn.disabled = false;
-          btn.querySelector('.btn-label').textContent = origLabel;
-          btn.querySelector('.btn-icon').textContent = '⬇';
-        }, 'image/png');
+        return new Promise(function(resolve) {
+          canvas.toBlob(function(blob) { resolve(blob); }, 'image/png');
+        });
+      }).then(function(blob) {
+        if (!blob) throw new Error('No blob');
+        var d = new Date();
+        var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        var fname = 'harmonic-intake-report-' + ds + '.png';
+
+        // Use Web Share API on mobile (saves to Photos / share sheet)
+        if (navigator.share && navigator.canShare) {
+          var file = new File([blob], fname, { type: 'image/png' });
+          var shareData = { files: [file], title: 'My Frequency Profile' };
+          if (navigator.canShare(shareData)) {
+            return navigator.share(shareData);
+          }
+        }
+
+        // Fallback for desktop: blob download
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+      }).then(function() {
+        btn.disabled = false;
+        btn.querySelector('.btn-label').textContent = origLabel;
+        btn.querySelector('.btn-icon').textContent = '⬇';
       }).catch(function() {
         btn.disabled = false;
         btn.querySelector('.btn-label').textContent = origLabel;
         btn.querySelector('.btn-icon').textContent = '⬇';
-        alert('Could not generate image. Try Print instead.');
       });
     }
   <\/script>
