@@ -267,6 +267,14 @@ export function useAudioAnalysis() {
     setScreen('countdown');
   }, [profile]);
 
+  /** Return from comparison view to the original (first) recording's results */
+  const backToOriginalResults = useCallback(() => {
+    if (previousProfile) {
+      setProfile(previousProfile);
+      setPreviousProfile(null);
+    }
+  }, [previousProfile]);
+
   return {
     screen,
     realTimeData,
@@ -278,5 +286,6 @@ export function useAudioAnalysis() {
     reset,
     beginRecording,
     startComparison,
+    backToOriginalResults,
   };
 }

@@ -189,28 +189,48 @@ export function ResultScreen({ profile, onReset, onCompare }: ResultScreenProps)
         <motion.div variants={fadeInUp}>
           <button
             onClick={onCompare}
-            className="group relative w-full cursor-pointer rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4 text-left backdrop-blur-sm transition-colors hover:bg-white/[0.06]"
+            className="compare-cta group relative w-full cursor-pointer overflow-hidden rounded-xl px-6 py-4 text-left backdrop-blur-md transition-all hover:scale-[1.01]"
             style={{
-              boxShadow: `0 0 0 1px ${profile.dominantChakra.color}15`,
+              background: `linear-gradient(135deg, ${profile.dominantChakra.color}08, ${profile.dominantChakra.color}15)`,
+              border: `1.5px solid ${profile.dominantChakra.color}50`,
+              boxShadow: `0 0 20px ${profile.dominantChakra.color}10, inset 0 1px 0 ${profile.dominantChakra.color}15`,
             }}
           >
-            {/* Pulsing border effect */}
+            {/* Animated pulsing glow border */}
             <span
-              className="pointer-events-none absolute inset-0 rounded-2xl opacity-60"
+              className="pointer-events-none absolute inset-[-1px] rounded-xl"
               style={{
-                border: `1px solid ${profile.dominantChakra.color}30`,
-                animation: 'compare-pulse 3s ease-in-out infinite',
+                border: `1.5px solid ${profile.dominantChakra.color}`,
+                animation: 'compare-pulse 2.5s ease-in-out infinite',
               }}
             />
-            <p className="mb-1.5 text-[10px] tracking-wider text-text-muted uppercase">
+            {/* Subtle background shimmer */}
+            <span
+              className="pointer-events-none absolute inset-0 rounded-xl opacity-30"
+              style={{
+                background: `radial-gradient(ellipse at 30% 50%, ${profile.dominantChakra.color}20 0%, transparent 70%)`,
+              }}
+            />
+            <p className="relative mb-2 text-[11px] tracking-wide text-text-secondary">
               Want to see how your voice changes after a session?
             </p>
-            <div className="flex items-center gap-2">
-              <GitCompareArrows size={16} style={{ color: profile.dominantChakra.color }} />
+            <div className="relative flex items-center gap-3">
+              <div
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
+                style={{ background: `${profile.dominantChakra.color}20` }}
+              >
+                <GitCompareArrows size={16} style={{ color: profile.dominantChakra.color }} />
+              </div>
               <span className="text-sm font-medium text-text-primary group-hover:text-white">
                 Record Again to Compare
               </span>
-              <span className="ml-auto font-mono text-[10px] text-text-dim">
+              <span
+                className="ml-auto rounded-md px-2 py-0.5 font-mono text-[10px]"
+                style={{
+                  background: `${profile.dominantChakra.color}15`,
+                  color: profile.dominantChakra.color,
+                }}
+              >
                 Before &amp; After
               </span>
             </div>

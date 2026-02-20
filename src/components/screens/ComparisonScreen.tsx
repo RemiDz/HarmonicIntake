@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { RotateCcw, ArrowRight } from 'lucide-react';
+import { RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
 import { Card } from '@/components/ui/Card';
@@ -11,6 +11,7 @@ interface ComparisonScreenProps {
   before: FrequencyProfile;
   after: FrequencyProfile;
   onReset: () => void;
+  onBackToResults: () => void;
 }
 
 const stagger = {
@@ -70,7 +71,7 @@ function generateChangeSummary(before: FrequencyProfile, after: FrequencyProfile
   return lines;
 }
 
-export function ComparisonScreen({ before, after, onReset }: ComparisonScreenProps) {
+export function ComparisonScreen({ before, after, onReset, onBackToResults }: ComparisonScreenProps) {
   const changes = generateChangeSummary(before, after);
 
   // Merge chakra scores for comparison (both arrays have same order)
@@ -91,6 +92,17 @@ export function ComparisonScreen({ before, after, onReset }: ComparisonScreenPro
       animate="visible"
     >
       <div className="w-full max-w-[420px] space-y-6">
+        {/* Back to results */}
+        <motion.div variants={fadeInUp}>
+          <button
+            onClick={onBackToResults}
+            className="group flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
+          >
+            <ArrowLeft size={14} />
+            Back to Original Results
+          </button>
+        </motion.div>
+
         {/* Header */}
         <motion.div variants={fadeInUp} className="text-center">
           <div className="mb-1 flex items-center justify-center gap-2 text-accent-primary">

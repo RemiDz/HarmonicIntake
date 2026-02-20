@@ -53,6 +53,7 @@ export default function Home() {
     reset,
     beginRecording,
     startComparison,
+    backToOriginalResults,
   } = useAudioAnalysis();
 
   // Accent colour for particles
@@ -156,6 +157,7 @@ export default function Home() {
               before={previousProfile}
               after={profile}
               onReset={reset}
+              onBackToResults={backToOriginalResults}
             />
           </motion.div>
         )}
