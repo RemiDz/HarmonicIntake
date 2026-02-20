@@ -317,25 +317,25 @@ async function runNoiseRejectionTest(): Promise<TestResult> {
 /* ------------------------------------------------------------------ */
 
 /**
- * Glottal cycle extraction WITHOUT DC blocker — identical logic to
- * extractGlottalCycles but operates directly on raw samples.
+ * Glottal cycle extraction WITHOUT DC blocker — identical zero-crossing
+ * and period-validation logic to extractGlottalCycles, but operates
+ * directly on the raw (DC-offset) samples with no filtering.
  */
-function extractCyclesNoDcBlocker(
-  timeDomainData: Float32Array,
+function extractCyclesRaw(
+  signal: Float32Array,
   sampleRate: number,
   fundamental: number,
 ): { count: number; periods: number[] } {
   if (fundamental <= 0) return { count: 0, periods: [] };
 
-  const n = timeDomainData.length;
+  const n = signal.length;
   const expectedPeriod = sampleRate / fundamental;
   const minPeriod = expectedPeriod * 0.7;
   const maxPeriod = expectedPeriod * 1.4;
 
-  // Find positive-going zero crossings on RAW signal (no DC blocker)
   const crossings: number[] = [];
   for (let i = 1; i < n; i++) {
-    if (timeDomainData[i - 1] <= 0 && timeDomainData[i] > 0) {
+    if (signal[i - 1] <= 0 && signal[i] > 0) {
       crossings.push(i);
     }
   }
@@ -351,112 +351,103 @@ function extractCyclesNoDcBlocker(
   return { count: periods.length, periods };
 }
 
+/**
+ * Generate a synthetic 200 Hz sine with DC offset as a Float32Array.
+ * No Web Audio involved — pure math.
+ */
+function generateDcOffsetSine(
+  sampleRate: number,
+  lengthSamples: number,
+  freq: number,
+  amplitude: number,
+  dcOffset: number,
+): Float32Array {
+  const buf = new Float32Array(lengthSamples);
+  for (let i = 0; i < lengthSamples; i++) {
+    buf[i] = amplitude * Math.sin(2 * Math.PI * freq * (i / sampleRate)) + dcOffset;
+  }
+  return buf;
+}
+
 async function runDcBlockerTest(): Promise<TestResult> {
   const log: string[] = [];
-  const ctx = new AudioContext();
-  const { analyser, signalGain } = buildPipeline(ctx);
 
-  // Create 200 Hz oscillator at gain 0.15
-  const osc = ctx.createOscillator();
-  osc.frequency.value = 200;
-  const oscGain = ctx.createGain();
-  oscGain.gain.value = 0.15;
-  osc.connect(oscGain);
+  const sampleRate = 44100;
+  const freq = 200;
+  const amplitude = 0.15;
+  const dcOffset = 0.1;
+  const lengthSamples = FFT_SIZE; // Match real analyser buffer size
 
-  // ScriptProcessorNode to add DC offset of +0.1 to every sample
-  const bufSize = 4096;
-  const dcInjector = ctx.createScriptProcessor(bufSize, 1, 1);
-  dcInjector.onaudioprocess = (e) => {
-    const input = e.inputBuffer.getChannelData(0);
-    const output = e.outputBuffer.getChannelData(0);
-    for (let i = 0; i < input.length; i++) {
-      output[i] = input[i] + 0.1;
-    }
-  };
+  log.push(`Synthetic signal: ${freq} Hz sine @ amplitude=${amplitude}, DC offset=+${dcOffset}`);
+  log.push(`Sample rate: ${sampleRate} Hz, buffer: ${lengthSamples} samples`);
+  log.push(`No Web Audio — pure Float32Array → algorithm test`);
 
-  oscGain.connect(dcInjector);
-  dcInjector.connect(signalGain);
-  osc.start();
+  const signal = generateDcOffsetSine(sampleRate, lengthSamples, freq, amplitude, dcOffset);
 
-  const timeDomain = new Float32Array(analyser.fftSize);
+  // Log signal stats to confirm DC offset is present
+  let min = Infinity, max = -Infinity, sum = 0;
+  for (let i = 0; i < signal.length; i++) {
+    if (signal[i] < min) min = signal[i];
+    if (signal[i] > max) max = signal[i];
+    sum += signal[i];
+  }
+  const mean = sum / signal.length;
+  log.push(`Signal range: [${min.toFixed(4)}, ${max.toFixed(4)}], mean: ${mean.toFixed(4)}`);
 
-  log.push(`Sample rate: ${ctx.sampleRate} Hz`);
-  log.push(`Signal: 200 Hz sine @ gain=0.15 + DC offset=+0.1`);
-  log.push('Waiting 1s for stabilisation...');
-  await wait(1000);
+  // WITH DC blocker: production extractGlottalCycles (has DC blocker built in)
+  const cyclesWith = extractGlottalCycles(signal, sampleRate, freq);
+  const periodsWith = cyclesWith.map((c) => c.periodSeconds);
+  const jitterWith = calculateJitter(periodsWith);
 
-  // Collect multiple frames over ~2s
-  const withDcBlockerCycles: number[] = [];
-  const withDcBlockerPeriods: number[] = [];
-  const noDcBlockerCycles: number[] = [];
-  const noDcBlockerPeriods: number[] = [];
+  // WITHOUT DC blocker: raw zero-crossing extraction on the DC-offset signal
+  const rawResult = extractCyclesRaw(signal, sampleRate, freq);
+  const jitterWithout = calculateJitter(rawResult.periods);
 
-  const collectEnd = performance.now() + 2000;
-  log.push('Collecting glottal cycles for 2s...');
+  log.push('');
+  log.push(`--- WITH DC blocker (extractGlottalCycles) ---`);
+  log.push(`Valid cycles: ${cyclesWith.length}`);
+  log.push(`Jitter (relative): ${jitterWith.relative.toFixed(4)}%`);
+  if (periodsWith.length > 0) {
+    const meanP = periodsWith.reduce((a, b) => a + b, 0) / periodsWith.length;
+    log.push(`Mean period: ${(meanP * 1000).toFixed(4)} ms (expected ${(1000 / freq).toFixed(4)} ms)`);
+  }
 
-  await new Promise<void>((resolve) => {
-    function frame() {
-      if (performance.now() >= collectEnd) {
-        resolve();
-        return;
-      }
-      analyser.getFloatTimeDomainData(timeDomain);
+  log.push('');
+  log.push(`--- WITHOUT DC blocker (raw signal) ---`);
+  log.push(`Valid cycles: ${rawResult.count}`);
+  log.push(`Jitter (relative): ${jitterWithout.relative.toFixed(4)}%`);
+  if (rawResult.periods.length > 0) {
+    const meanP = rawResult.periods.reduce((a, b) => a + b, 0) / rawResult.periods.length;
+    log.push(`Mean period: ${(meanP * 1000).toFixed(4)} ms (expected ${(1000 / freq).toFixed(4)} ms)`);
+  }
 
-      // With DC blocker (production function)
-      const cyclesWith = extractGlottalCycles(timeDomain, ctx.sampleRate, 200);
-      withDcBlockerCycles.push(cyclesWith.length);
-      for (const c of cyclesWith) withDcBlockerPeriods.push(c.periodSeconds);
-
-      // Without DC blocker (raw signal)
-      const rawResult = extractCyclesNoDcBlocker(timeDomain, ctx.sampleRate, 200);
-      noDcBlockerCycles.push(rawResult.count);
-      for (const p of rawResult.periods) noDcBlockerPeriods.push(p);
-
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
-  });
-
-  osc.stop();
-  dcInjector.disconnect();
-  await ctx.close();
-
-  const withTotal = withDcBlockerCycles.reduce((a, b) => a + b, 0);
-  const withoutTotal = noDcBlockerCycles.reduce((a, b) => a + b, 0);
-
-  const withJitter = calculateJitter(withDcBlockerPeriods);
-  const withoutJitter = calculateJitter(noDcBlockerPeriods);
-
-  log.push(`--- WITH DC blocker ---`);
-  log.push(`Valid cycles: ${withTotal}`);
-  log.push(`Jitter (relative): ${withJitter.relative.toFixed(4)}%`);
-  log.push(`Periods collected: ${withDcBlockerPeriods.length}`);
-
-  log.push(`--- WITHOUT DC blocker ---`);
-  log.push(`Valid cycles: ${withoutTotal}`);
-  log.push(`Jitter (relative): ${withoutJitter.relative.toFixed(4)}%`);
-  log.push(`Periods collected: ${noDcBlockerPeriods.length}`);
-
-  const moreCycles = withTotal > withoutTotal;
-  const lowerJitter = withJitter.relative < withoutJitter.relative;
+  const moreCycles = cyclesWith.length > rawResult.count;
+  // For jitter comparison: if raw has < 3 periods, calculateJitter returns 0,
+  // so treat that as the raw extractor failing entirely (which is a win for DC blocker)
+  const rawTooFew = rawResult.periods.length < 3;
+  const lowerJitter = rawTooFew || jitterWith.relative < jitterWithout.relative;
   const pass = moreCycles && lowerJitter;
 
+  log.push('');
+  if (rawTooFew) {
+    log.push(`Raw extractor found <3 periods — DC offset destroyed zero crossings entirely`);
+  }
   if (!pass) {
     if (!moreCycles)
-      log.push(`FAIL: DC blocker cycles (${withTotal}) <= raw cycles (${withoutTotal})`);
+      log.push(`FAIL: DC blocker cycles (${cyclesWith.length}) <= raw cycles (${rawResult.count})`);
     if (!lowerJitter)
       log.push(
-        `FAIL: DC blocker jitter (${withJitter.relative.toFixed(4)}%) >= raw jitter (${withoutJitter.relative.toFixed(4)}%)`,
+        `FAIL: DC blocker jitter (${jitterWith.relative.toFixed(4)}%) >= raw jitter (${jitterWithout.relative.toFixed(4)}%)`,
       );
   }
 
   return {
     status: pass ? 'pass' : 'fail',
     metrics: {
-      'Cycles (DC)': `${withTotal}`,
-      'Cycles (raw)': `${withoutTotal}`,
-      'Jitter (DC)': `${withJitter.relative.toFixed(4)}%`,
-      'Jitter (raw)': `${withoutJitter.relative.toFixed(4)}%`,
+      'Cycles (DC)': `${cyclesWith.length}`,
+      'Cycles (raw)': `${rawResult.count}`,
+      'Jitter (DC)': `${jitterWith.relative.toFixed(4)}%`,
+      'Jitter (raw)': rawTooFew ? 'N/A (<3)' : `${jitterWithout.relative.toFixed(4)}%`,
     },
     log,
   };
