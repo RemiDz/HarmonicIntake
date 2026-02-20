@@ -185,6 +185,38 @@ export function ResultScreen({ profile, onReset, onCompare }: ResultScreenProps)
           </Card>
         </motion.div>
 
+        {/* ── Compare Sessions CTA ── */}
+        <motion.div variants={fadeInUp}>
+          <button
+            onClick={onCompare}
+            className="group relative w-full cursor-pointer rounded-2xl border border-white/[0.08] bg-white/[0.03] px-5 py-4 text-left backdrop-blur-sm transition-colors hover:bg-white/[0.06]"
+            style={{
+              boxShadow: `0 0 0 1px ${profile.dominantChakra.color}15`,
+            }}
+          >
+            {/* Pulsing border effect */}
+            <span
+              className="pointer-events-none absolute inset-0 rounded-2xl opacity-60"
+              style={{
+                border: `1px solid ${profile.dominantChakra.color}30`,
+                animation: 'compare-pulse 3s ease-in-out infinite',
+              }}
+            />
+            <p className="mb-1.5 text-[10px] tracking-wider text-text-muted uppercase">
+              Want to see how your voice changes after a session?
+            </p>
+            <div className="flex items-center gap-2">
+              <GitCompareArrows size={16} style={{ color: profile.dominantChakra.color }} />
+              <span className="text-sm font-medium text-text-primary group-hover:text-white">
+                Record Again to Compare
+              </span>
+              <span className="ml-auto font-mono text-[10px] text-text-dim">
+                Before &amp; After
+              </span>
+            </div>
+          </button>
+        </motion.div>
+
         {/* ── Voice Quality Bars ── */}
         <motion.div variants={fadeInUp}>
           <p className="mb-3 text-[10px] tracking-wider text-text-dim uppercase">
@@ -422,13 +454,7 @@ export function ResultScreen({ profile, onReset, onCompare }: ResultScreenProps)
           </Button>
         </motion.div>
 
-        {/* ── Compare / New Analysis ── */}
-        <motion.div variants={fadeInUp} className="flex justify-center gap-3">
-          <Button variant="ghost" onClick={onCompare}>
-            <GitCompareArrows size={16} />
-            Record Again to Compare
-          </Button>
-        </motion.div>
+        {/* ── New Analysis ── */}
         <motion.div variants={fadeInUp} className="flex justify-center">
           <Button variant="ghost" onClick={onReset}>
             <RotateCcw size={16} />

@@ -327,13 +327,56 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
     }
     .footer a { color: #4FA8D6; text-decoration: none; }
 
+    .nav-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: rgba(5, 12, 21, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid #162535;
+    }
+    .nav-bar a, .nav-bar button {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: #8aa5bb;
+      text-decoration: none;
+      background: none;
+      border: 1px solid #162535;
+      border-radius: 8px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .nav-bar a:hover, .nav-bar button:hover {
+      color: #d8e8f5;
+      border-color: #2a4560;
+      background: rgba(22, 37, 53, 0.5);
+    }
+    .nav-back { display: flex; align-items: center; gap: 6px; }
+    .nav-actions { display: flex; gap: 8px; }
+
     @media print {
       body { background: #050c15; }
       .container { max-width: 100%; }
+      .nav-bar { display: none; }
     }
   </style>
 </head>
 <body>
+  <div class="nav-bar">
+    <a class="nav-back" href="https://harmonic-intake.vercel.app" onclick="if(window.opener||window.history.length<=1){window.close();return false;}">
+      ← Back to Harmonic Intake
+    </a>
+    <div class="nav-actions">
+      <button onclick="window.print()">Print</button>
+      <button onclick="(function(){var a=document.createElement('a');a.href=window.location.href;a.download='frequency-profile.html';document.body.appendChild(a);a.click();document.body.removeChild(a);})()">Download</button>
+    </div>
+  </div>
   <div class="container">
 
     <div class="header">

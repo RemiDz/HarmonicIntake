@@ -108,6 +108,11 @@ body {
   50% { background-position: 100% center; }
 }
 
+@keyframes compare-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.005); }
+}
+
 /* ── Utility Classes ── */
 
 .text-shimmer {
