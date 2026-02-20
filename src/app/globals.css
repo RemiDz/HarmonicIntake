@@ -113,6 +113,18 @@ body {
   50% { opacity: 0.6; }
 }
 
+@keyframes mic-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.15); opacity: 0.1; }
+}
+
+.animate-mic-pulse {
+  animation: mic-pulse 2s ease-in-out infinite;
+}
+.animate-mic-pulse-delayed {
+  animation: mic-pulse 2s ease-in-out infinite 0.4s;
+}
+
 /* ── Utility Classes ── */
 
 .text-shimmer {

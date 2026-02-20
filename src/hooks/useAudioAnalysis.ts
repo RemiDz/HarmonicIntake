@@ -51,6 +51,9 @@ export function useAudioAnalysis() {
   const [previousProfile, setPreviousProfile] = useState<FrequencyProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const micGrantedRef = useRef(false);
+  const micDeniedRef = useRef(false);
+
   const recorderRef = useRef<AudioRecorderHandle | null>(null);
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
@@ -262,6 +265,8 @@ export function useAudioAnalysis() {
 
       const recorder = await startRecording();
       recorderRef.current = recorder;
+      micGrantedRef.current = true;
+      micDeniedRef.current = false;
 
       setScreen('recording');
       startTimeRef.current = performance.now();
@@ -270,13 +275,17 @@ export function useAudioAnalysis() {
       playTing();
     } catch (err) {
       cleanup();
-      setScreen('idle');
       if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        micGrantedRef.current = false;
+        micDeniedRef.current = true;
         setError('Microphone access was denied. Please allow microphone access and try again.');
+        setScreen('mic-permission');
       } else if (err instanceof DOMException && err.name === 'NotFoundError') {
         setError('No microphone found. Please connect a microphone and try again.');
+        setScreen('idle');
       } else {
         setError('Could not access microphone. Please check your browser settings.');
+        setScreen('idle');
       }
     }
   }, [analysisLoop, cleanup]);
@@ -284,6 +293,16 @@ export function useAudioAnalysis() {
   const start = useCallback(() => {
     setProfile(null);
     setRealTimeData(EMPTY_REALTIME);
+    if (micGrantedRef.current) {
+      setScreen('countdown');
+    } else {
+      setError(null);
+      setScreen('mic-permission');
+    }
+  }, []);
+
+  const confirmMicPermission = useCallback(() => {
+    setError(null);
     setScreen('countdown');
   }, []);
 
@@ -311,6 +330,7 @@ export function useAudioAnalysis() {
     }
     setProfile(null);
     setRealTimeData(EMPTY_REALTIME);
+    // Mic already granted from the first recording — skip pre-screen
     setScreen('countdown');
   }, [profile]);
 
@@ -332,6 +352,7 @@ export function useAudioAnalysis() {
     stop,
     reset,
     beginRecording,
+    confirmMicPermission,
     startComparison,
     backToOriginalResults,
   };

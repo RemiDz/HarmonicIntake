@@ -9,12 +9,19 @@ import { LiveScreen } from '@/components/screens/LiveScreen';
 import { AnalysingScreen } from '@/components/screens/AnalysingScreen';
 import { ResultScreen } from '@/components/screens/ResultScreen';
 import { ComparisonScreen } from '@/components/screens/ComparisonScreen';
+import { MicPermissionScreen } from '@/components/screens/MicPermissionScreen';
 
 // Transition variants per screen
 const idleVariants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
   exit: { opacity: 0, scale: 0.95, transition: { duration: 0.3 } },
+};
+
+const micPermissionVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1, transition: { duration: 0.3 } },
+  exit: { opacity: 0, transition: { duration: 0.2 } },
 };
 
 const countdownVariants = {
@@ -52,6 +59,7 @@ export default function Home() {
     stop,
     reset,
     beginRecording,
+    confirmMicPermission,
     startComparison,
     backToOriginalResults,
   } = useAudioAnalysis();
@@ -86,6 +94,18 @@ export default function Home() {
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
             <IdleScreen onStart={start} error={error} />
+          </motion.div>
+        )}
+
+        {screen === 'mic-permission' && (
+          <motion.div
+            key="mic-permission"
+            variants={micPermissionVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+          >
+            <MicPermissionScreen onConfirm={confirmMicPermission} error={error} />
           </motion.div>
         )}
 

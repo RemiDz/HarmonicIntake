@@ -1,11 +1,13 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { RotateCcw, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { RotateCcw, ArrowRight, ArrowLeft, Share2, Download } from 'lucide-react';
 import type { FrequencyProfile } from '@/lib/types';
 import VoiceWaveform from '@/components/viz/VoiceWaveform';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { generateComparisonCard } from '@/lib/share/generate-comparison-card';
 
 interface ComparisonScreenProps {
   before: FrequencyProfile;
@@ -73,6 +75,26 @@ function generateChangeSummary(before: FrequencyProfile, after: FrequencyProfile
 
 export function ComparisonScreen({ before, after, onReset, onBackToResults }: ComparisonScreenProps) {
   const changes = generateChangeSummary(before, after);
+  const [sharing, setSharing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleShare = async () => {
+    setSharing(true);
+    try {
+      await generateComparisonCard(before, after);
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      await generateComparisonCard(before, after, { forceDownload: true });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Merge chakra scores for comparison (both arrays have same order)
   const chakraPairs = before.chakraScores.map((bs, i) => ({
@@ -92,15 +114,25 @@ export function ComparisonScreen({ before, after, onReset, onBackToResults }: Co
       animate="visible"
     >
       <div className="w-full max-w-[420px] space-y-6">
-        {/* Back to results */}
-        <motion.div variants={fadeInUp}>
+        {/* Top action bar */}
+        <motion.div variants={fadeInUp} className="flex items-center justify-between gap-2">
           <button
             onClick={onBackToResults}
             className="group flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-text-secondary transition-colors hover:border-border-hover hover:text-text-primary"
           >
             <ArrowLeft size={14} />
-            Back to Original Results
+            Back
           </button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={handleShare} disabled={sharing}>
+              <Share2 size={14} />
+              {sharing ? 'Sharing...' : 'Share'}
+            </Button>
+            <Button variant="secondary" onClick={handleDownload} disabled={downloading}>
+              <Download size={14} />
+              {downloading ? 'Saving...' : 'Download'}
+            </Button>
+          </div>
         </motion.div>
 
         {/* Header */}
