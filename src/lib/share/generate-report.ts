@@ -333,14 +333,15 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
       z-index: 100;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 10px 20px;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
       background: rgba(5, 12, 21, 0.92);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid #162535;
     }
-    .nav-bar a, .nav-bar button {
+    .nav-btn {
       font-family: 'DM Mono', monospace;
       font-size: 12px;
       color: #8aa5bb;
@@ -348,17 +349,33 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
       background: none;
       border: 1px solid #162535;
       border-radius: 8px;
-      padding: 6px 14px;
+      padding: 8px 16px;
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      height: 36px;
+      line-height: 1;
     }
-    .nav-bar a:hover, .nav-bar button:hover {
+    .nav-btn:hover {
       color: #d8e8f5;
       border-color: #2a4560;
       background: rgba(22, 37, 53, 0.5);
     }
-    .nav-back { display: flex; align-items: center; gap: 6px; }
-    .nav-actions { display: flex; gap: 8px; }
+    .nav-btn:disabled {
+      opacity: 0.5;
+      cursor: wait;
+    }
+    .nav-btn .btn-label { display: inline; }
+    .nav-btn .btn-icon { display: none; font-style: normal; }
+
+    @media (max-width: 380px) {
+      .nav-btn { padding: 8px 12px; flex-direction: column; gap: 2px; height: auto; }
+      .nav-btn .btn-label { display: none; }
+      .nav-btn .btn-icon { display: inline; font-size: 16px; }
+    }
 
     @media print {
       body { background: #050c15; }
@@ -366,17 +383,59 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
       .nav-bar { display: none; }
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
 </head>
 <body>
   <div class="nav-bar">
-    <a class="nav-back" href="https://harmonic-intake.vercel.app" onclick="if(window.opener||window.history.length<=1){window.close();return false;}">
-      ← Back to Harmonic Intake
+    <a class="nav-btn" href="https://harmonic-intake.vercel.app" onclick="if(window.opener||window.history.length<=1){window.close();return false;}">
+      <em class="btn-icon">←</em>
+      <span class="btn-label">← Back</span>
     </a>
-    <div class="nav-actions">
-      <button onclick="window.print()">Print</button>
-      <button onclick="(function(){var a=document.createElement('a');a.href=window.location.href;a.download='frequency-profile.html';document.body.appendChild(a);a.click();document.body.removeChild(a);})()">Download</button>
-    </div>
+    <button class="nav-btn" onclick="window.print()">
+      <em class="btn-icon">🖨</em>
+      <span class="btn-label">Print</span>
+    </button>
+    <button class="nav-btn" id="dl-btn" onclick="downloadPNG()">
+      <em class="btn-icon">⬇</em>
+      <span class="btn-label">Download</span>
+    </button>
   </div>
+  <script>
+    function downloadPNG() {
+      var btn = document.getElementById('dl-btn');
+      var origLabel = btn.querySelector('.btn-label').textContent;
+      btn.disabled = true;
+      btn.querySelector('.btn-label').textContent = 'Saving...';
+      btn.querySelector('.btn-icon').textContent = '⏳';
+      var el = document.querySelector('.container');
+      html2canvas(el, {
+        backgroundColor: '#050c15',
+        scale: 2,
+        useCORS: true,
+        logging: false
+      }).then(function(canvas) {
+        canvas.toBlob(function(blob) {
+          var d = new Date();
+          var ds = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'harmonic-intake-report-' + ds + '.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(a.href);
+          btn.disabled = false;
+          btn.querySelector('.btn-label').textContent = origLabel;
+          btn.querySelector('.btn-icon').textContent = '⬇';
+        }, 'image/png');
+      }).catch(function() {
+        btn.disabled = false;
+        btn.querySelector('.btn-label').textContent = origLabel;
+        btn.querySelector('.btn-icon').textContent = '⬇';
+        alert('Could not generate image. Try Print instead.');
+      });
+    }
+  <\/script>
   <div class="container">
 
     <div class="header">
