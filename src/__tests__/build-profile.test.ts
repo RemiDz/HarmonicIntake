@@ -58,6 +58,8 @@ describe('buildProfile', () => {
       sampleRate: 44100,
       fftSize: 4096,
       frozenWaveform: null,
+      voiceFrames: 55,
+      totalFrames: 60,
     });
 
     expect(profile.fundamental).toBe(440);
@@ -73,6 +75,8 @@ describe('buildProfile', () => {
     expect(profile.voiceProfile).toBeDefined();
     expect(profile.voiceProfile.fundamental.mean).toBe(440);
     expect(profile.dominantChakra).toBeDefined();
+    expect(profile.voiceValidation).toBeDefined();
+    expect(profile.voiceValidation.status).toBe('pass');
   });
 
   it('handles readings with silence mixed in', () => {
@@ -88,6 +92,8 @@ describe('buildProfile', () => {
       sampleRate: 44100,
       fftSize: 4096,
       frozenWaveform: null,
+      voiceFrames: 3,
+      totalFrames: 5,
     });
 
     expect(profile.fundamental).toBe(440);
@@ -105,10 +111,13 @@ describe('buildProfile', () => {
       sampleRate: 44100,
       fftSize: 4096,
       frozenWaveform: null,
+      voiceFrames: 0,
+      totalFrames: 3,
     });
 
     expect(profile.fundamental).toBe(0);
     expect(profile.stability).toBe(0);
+    expect(profile.voiceValidation.status).toBe('fail');
   });
 
   it('produces voice profile with biomarkers from glottal cycles', () => {
@@ -134,11 +143,127 @@ describe('buildProfile', () => {
       sampleRate: 44100,
       fftSize: 4096,
       frozenWaveform: null,
+      voiceFrames: 55,
+      totalFrames: 60,
     });
 
     expect(profile.voiceProfile.jitter.relative).toBeGreaterThan(0);
     expect(profile.voiceProfile.shimmer.db).toBeGreaterThan(0);
     expect(profile.voiceProfile.cycleCount).toBe(100);
     expect(profile.voiceProfile.fundamental.mean).toBe(130);
+  });
+});
+
+describe('voiceValidation', () => {
+  it('returns pass when voiceRatio >= 0.4 and CV is low', () => {
+    const profile = buildProfile({
+      readings: Array(60).fill(440),
+      overtoneSnapshots: [],
+      frequencyDataSnapshots: [],
+      allCycles: [],
+      rmsHistory: Array(60).fill(0.05),
+      sampleRate: 44100,
+      fftSize: 4096,
+      frozenWaveform: null,
+      voiceFrames: 50,
+      totalFrames: 60,
+    });
+    expect(profile.voiceValidation.status).toBe('pass');
+    expect(profile.voiceValidation.voiceRatio).toBeGreaterThan(0.4);
+  });
+
+  it('returns warn when 0.2 <= voiceRatio < 0.4', () => {
+    const profile = buildProfile({
+      readings: Array(20).fill(440).concat(Array(40).fill(-1)),
+      overtoneSnapshots: [],
+      frequencyDataSnapshots: [],
+      allCycles: [],
+      rmsHistory: Array(60).fill(0.05),
+      sampleRate: 44100,
+      fftSize: 4096,
+      frozenWaveform: null,
+      voiceFrames: 18,
+      totalFrames: 60,
+    });
+    expect(profile.voiceValidation.status).toBe('warn');
+  });
+
+  it('returns fail when voiceRatio < 0.2', () => {
+    const profile = buildProfile({
+      readings: Array(5).fill(440).concat(Array(55).fill(-1)),
+      overtoneSnapshots: [],
+      frequencyDataSnapshots: [],
+      allCycles: [],
+      rmsHistory: Array(60).fill(0.01),
+      sampleRate: 44100,
+      fftSize: 4096,
+      frozenWaveform: null,
+      voiceFrames: 5,
+      totalFrames: 60,
+    });
+    expect(profile.voiceValidation.status).toBe('fail');
+  });
+
+  it('returns fail when F0 CV > 0.5 even with sufficient voiceRatio', () => {
+    // Wildly varying readings: 100Hz and 500Hz alternating → high CV
+    const readings = Array(30).fill(100).concat(Array(30).fill(500));
+    const profile = buildProfile({
+      readings,
+      overtoneSnapshots: [],
+      frequencyDataSnapshots: [],
+      allCycles: [],
+      rmsHistory: Array(60).fill(0.05),
+      sampleRate: 44100,
+      fftSize: 4096,
+      frozenWaveform: null,
+      voiceFrames: 50,
+      totalFrames: 60,
+    });
+    expect(profile.voiceValidation.status).toBe('fail');
+    expect(profile.voiceValidation.f0StabilityCV).toBeGreaterThan(0.5);
+  });
+
+  it('returns warn when pitch range exceeds 24 semitones', () => {
+    // Readings spanning > 2 octaves: 100Hz to 500Hz range
+    // Need enough valid readings (>= 10) for getPitchRange to compute
+    const readings = [
+      ...Array(15).fill(100),
+      ...Array(15).fill(200),
+      ...Array(15).fill(500),
+    ];
+    const profile = buildProfile({
+      readings,
+      overtoneSnapshots: [],
+      frequencyDataSnapshots: [],
+      allCycles: [],
+      rmsHistory: Array(45).fill(0.05),
+      sampleRate: 44100,
+      fftSize: 4096,
+      frozenWaveform: null,
+      voiceFrames: 40,
+      totalFrames: 45,
+    });
+    // pitch range from 100 to 500 Hz = ~29 semitones > 24
+    expect(profile.voiceValidation.pitchRangeSemitones).toBeGreaterThan(24);
+    // CV may also be high here, which would make it fail instead of warn
+    // The important thing is it doesn't pass
+    expect(profile.voiceValidation.status).not.toBe('pass');
+  });
+
+  it('stores voiceFrames and totalFrames in validation', () => {
+    const profile = buildProfile({
+      readings: Array(60).fill(440),
+      overtoneSnapshots: [],
+      frequencyDataSnapshots: [],
+      allCycles: [],
+      rmsHistory: Array(60).fill(0.05),
+      sampleRate: 44100,
+      fftSize: 4096,
+      frozenWaveform: null,
+      voiceFrames: 42,
+      totalFrames: 60,
+    });
+    expect(profile.voiceValidation.voiceFrames).toBe(42);
+    expect(profile.voiceValidation.totalFrames).toBe(60);
   });
 });

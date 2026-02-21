@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import type { AppScreen, FrequencyProfile, RealTimeData, Overtone } from '@/lib/types';
+import type { AppScreen, FrequencyProfile, RealTimeData, Overtone, LiveVoiceStatus } from '@/lib/types';
 import { detectPitch } from '@/lib/audio/pitch-detection';
 import { extractOvertones } from '@/lib/audio/overtone-analysis';
 import { extractSpectrum } from '@/lib/audio/spectrum';
@@ -42,6 +42,8 @@ const EMPTY_REALTIME: RealTimeData = {
   liveJitterRelative: 0,
   timeDomainData: null,
   rmsEnergy: 0,
+  liveVoiceStatus: 'silence',
+  voiceClarity: 0,
 };
 
 export function useAudioAnalysis() {
@@ -71,6 +73,8 @@ export function useAudioAnalysis() {
   const recentF0sRef = useRef<number[]>([]);
   const frameCountRef = useRef(0);
   const lastHzRef = useRef(-1);
+  const voiceFramesRef = useRef(0);
+  const totalFramesRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -97,6 +101,8 @@ export function useAudioAnalysis() {
         sampleRate,
         fftSize,
         frozenWaveform: frozenWaveformRef.current,
+        voiceFrames: voiceFramesRef.current,
+        totalFrames: totalFramesRef.current,
       });
 
       setProfile(result);
@@ -139,6 +145,7 @@ export function useAudioAnalysis() {
     // Autocorrelation is ~200M multiply-add ops/sec at 60fps; halving saves ~50% CPU.
     // 450 readings over 15s at 30Hz is more than sufficient for accurate results.
     let hz = lastHzRef.current;
+    let flatness = 0;
     const runPitchFrame = frameCountRef.current % 2 === 0;
 
     if (runPitchFrame) {
@@ -146,7 +153,7 @@ export function useAudioAnalysis() {
 
       // Reject noise-like signals via spectral flatness (white noise ≈ 1, tonal ≈ 0)
       if (hz > 0) {
-        const flatness = getSpectralFlatness(freqDomain, recorder.sampleRate, recorder.analyser.fftSize);
+        flatness = getSpectralFlatness(freqDomain, recorder.sampleRate, recorder.analyser.fftSize);
         if (flatness > 0.5) hz = -1;
       }
 
@@ -173,6 +180,25 @@ export function useAudioAnalysis() {
         allCyclesRef.current.push(...cycles);
       }
     }
+
+    // ── Voice validation tracking ──
+    totalFramesRef.current++;
+    let liveVoiceStatus: LiveVoiceStatus;
+
+    if (rms < 0.01) {
+      liveVoiceStatus = 'silence';
+    } else if (runPitchFrame && flatness > 0.5) {
+      liveVoiceStatus = 'noise';
+    } else if (hz > 0) {
+      liveVoiceStatus = 'voice-detected';
+      voiceFramesRef.current++;
+    } else {
+      liveVoiceStatus = 'low-volume';
+    }
+
+    const voiceClarity = totalFramesRef.current > 0
+      ? Math.round((voiceFramesRef.current / totalFramesRef.current) * 100)
+      : 0;
 
     // Store frequency data snapshot (copy since the buffer is reused)
     const freqCopy = new Float32Array(freqDomain);
@@ -241,6 +267,8 @@ export function useAudioAnalysis() {
       liveJitterRelative: Math.round(liveJitterRelative * 100) / 100,
       timeDomainData: new Float32Array(timeDomain),
       rmsEnergy: rms,
+      liveVoiceStatus,
+      voiceClarity,
     });
 
     rafRef.current = requestAnimationFrame(analysisLoop);
@@ -262,6 +290,8 @@ export function useAudioAnalysis() {
       recentF0sRef.current = [];
       frameCountRef.current = 0;
       lastHzRef.current = -1;
+      voiceFramesRef.current = 0;
+      totalFramesRef.current = 0;
 
       const recorder = await startRecording();
       recorderRef.current = recorder;
@@ -323,6 +353,13 @@ export function useAudioAnalysis() {
     setScreen('idle');
   }, [cleanup]);
 
+  /** Retry recording (skip idle — mic already granted) */
+  const retry = useCallback(() => {
+    setProfile(null);
+    setRealTimeData(EMPTY_REALTIME);
+    setScreen('countdown');
+  }, []);
+
   /** Save current profile as "before" and start a new recording for comparison */
   const startComparison = useCallback(() => {
     if (profile) {
@@ -351,6 +388,7 @@ export function useAudioAnalysis() {
     start,
     stop,
     reset,
+    retry,
     beginRecording,
     confirmMicPermission,
     startComparison,

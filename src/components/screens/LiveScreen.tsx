@@ -64,6 +64,35 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
           </div>
         </div>
 
+        {/* Voice quality indicator */}
+        <div className="flex items-center justify-between rounded-xl border border-border bg-bg-card/40 px-4 py-2 backdrop-blur-sm">
+          <div className="flex items-center gap-2">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                data.liveVoiceStatus === 'voice-detected'
+                  ? 'bg-success'
+                  : data.liveVoiceStatus === 'low-volume'
+                    ? 'bg-warning'
+                    : data.liveVoiceStatus === 'noise'
+                      ? 'bg-error'
+                      : 'bg-text-dim'
+              }`}
+            />
+            <span className="font-mono text-[10px] text-text-secondary">
+              {data.liveVoiceStatus === 'voice-detected'
+                ? 'Voice detected'
+                : data.liveVoiceStatus === 'low-volume'
+                  ? 'Speak closer to mic'
+                  : data.liveVoiceStatus === 'noise'
+                    ? 'Background noise'
+                    : 'Waiting for voice\u2026'}
+            </span>
+          </div>
+          <span className="font-mono text-[10px] text-text-muted">
+            Clarity: {data.voiceClarity}%
+          </span>
+        </div>
+
         {/* Voice Waveform — hero visual */}
         <VoiceWaveform
           timeDomainData={data.timeDomainData}

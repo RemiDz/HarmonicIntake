@@ -207,7 +207,10 @@ SESSION GUIDANCE
 
 ${getHumanInstrumentSuggestion(richness)}
 
-This analysis explores the acoustic qualities of your voice through a wellness lens. It is not a medical, diagnostic, or clinical assessment.
+${profile.voiceValidation?.status === 'warn' ? `RECORDING NOTE
+This recording had ${Math.round(profile.voiceValidation.voiceRatio * 100)}% voice clarity. For best results, sustain a steady hum in a quiet space.
+
+` : ''}This analysis explores the acoustic qualities of your voice through a wellness lens. It is not a medical, diagnostic, or clinical assessment.
 
 —
 With resonance,

@@ -118,6 +118,19 @@ export function ResultScreen({ profile, onReset, onCompare }: ResultScreenProps)
           </p>
         </motion.div>
 
+        {/* ── Voice quality warning banner ── */}
+        {profile.voiceValidation.status === 'warn' && (
+          <motion.div variants={fadeInUp}>
+            <div className="rounded-xl border border-warning/20 bg-warning/5 px-4 py-3">
+              <p className="text-xs leading-relaxed text-warning/80">
+                <span className="font-medium text-warning">Low voice clarity.</span>{' '}
+                Only {Math.round(profile.voiceValidation.voiceRatio * 100)}% of this recording
+                contained a clear vocal signal. For best results, sustain a steady hum in a quiet space.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* ── Voice Signature waveform ── */}
         <motion.div variants={fadeInUp}>
           <VoiceWaveform
@@ -481,6 +494,17 @@ export function ResultScreen({ profile, onReset, onCompare }: ResultScreenProps)
             New Analysis
           </Button>
         </motion.div>
+
+        {/* ── Recording quality note ── */}
+        {profile.voiceValidation.status === 'warn' && (
+          <motion.p
+            variants={fadeInUp}
+            className="rounded-xl border border-warning/10 bg-warning/5 px-4 py-3 text-center text-[10px] leading-relaxed text-warning/60"
+          >
+            Recording conditions: {Math.round(profile.voiceValidation.voiceRatio * 100)}% voice
+            clarity. Moderate background noise detected — results may be less precise.
+          </motion.p>
+        )}
 
         {/* ── Disclaimer ── */}
         <motion.p

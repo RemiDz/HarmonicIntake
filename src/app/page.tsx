@@ -10,6 +10,7 @@ import { AnalysingScreen } from '@/components/screens/AnalysingScreen';
 import { ResultScreen } from '@/components/screens/ResultScreen';
 import { ComparisonScreen } from '@/components/screens/ComparisonScreen';
 import { MicPermissionScreen } from '@/components/screens/MicPermissionScreen';
+import { VoiceValidationFailed } from '@/components/screens/VoiceValidationFailed';
 
 // Transition variants per screen
 const idleVariants = {
@@ -58,6 +59,7 @@ export default function Home() {
     start,
     stop,
     reset,
+    retry,
     beginRecording,
     confirmMicPermission,
     startComparison,
@@ -157,11 +159,19 @@ export default function Home() {
             animate="animate"
             exit="exit"
           >
-            <ResultScreen
-              profile={profile}
-              onReset={reset}
-              onCompare={startComparison}
-            />
+            {profile.voiceValidation.status === 'fail' ? (
+              <VoiceValidationFailed
+                voiceRatio={profile.voiceValidation.voiceRatio}
+                onRetry={retry}
+                onReset={reset}
+              />
+            ) : (
+              <ResultScreen
+                profile={profile}
+                onReset={reset}
+                onCompare={startComparison}
+              />
+            )}
           </motion.div>
         )}
 

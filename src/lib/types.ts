@@ -70,6 +70,20 @@ export interface VoiceProfile {
   cycleCount: number;
 }
 
+// ── Voice Validation Types ──
+
+export type VoiceValidationStatus = 'pass' | 'warn' | 'fail';
+export type LiveVoiceStatus = 'voice-detected' | 'low-volume' | 'noise' | 'silence';
+
+export interface VoiceValidation {
+  voiceRatio: number;           // 0-1: voiceFrames / totalFrames
+  voiceFrames: number;
+  totalFrames: number;
+  status: VoiceValidationStatus;
+  f0StabilityCV: number;        // coefficient of variation of valid F0 readings
+  pitchRangeSemitones: number;  // range in semitones across recording
+}
+
 export interface FrequencyProfile {
   fundamental: number;
   noteInfo: NoteInfo;
@@ -84,6 +98,7 @@ export interface FrequencyProfile {
   voiceProfile: VoiceProfile;
   dominantChakra: ChakraScore;
   frozenWaveform: Float32Array | null;
+  voiceValidation: VoiceValidation;
 }
 
 export type AppScreen = 'idle' | 'mic-permission' | 'countdown' | 'recording' | 'analysing' | 'complete';
@@ -101,4 +116,6 @@ export interface RealTimeData {
   liveJitterRelative: number;
   timeDomainData: Float32Array | null;
   rmsEnergy: number;
+  liveVoiceStatus: LiveVoiceStatus;
+  voiceClarity: number;          // 0-100 running percentage
 }

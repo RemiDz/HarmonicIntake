@@ -66,6 +66,14 @@ function generateChangeSummary(before: FrequencyProfile, after: FrequencyProfile
     lines.push(`Fundamental frequency moved from ${before.fundamental} Hz to ${after.fundamental} Hz.`);
   }
 
+  if (before.voiceValidation && after.voiceValidation) {
+    const clarBefore = Math.round(before.voiceValidation.voiceRatio * 100);
+    const clarAfter = Math.round(after.voiceValidation.voiceRatio * 100);
+    if (Math.abs(clarAfter - clarBefore) > 5) {
+      lines.push(`Voice clarity ${directionWord(clarBefore, clarAfter)} from ${clarBefore}% to ${clarAfter}%.`);
+    }
+  }
+
   if (lines.length === 0) {
     lines.push('Your voice profile remained consistent between recordings.');
   }
@@ -207,6 +215,18 @@ export function ComparisonScreen({ before, after, onReset, onBackToResults }: Co
                 change={delta(before.richness, after.richness)}
                 improved={after.richness >= before.richness}
               />
+              {before.voiceValidation && after.voiceValidation && (
+                <MetricRow
+                  label="Voice Clarity"
+                  before={`${Math.round(before.voiceValidation.voiceRatio * 100)}%`}
+                  after={`${Math.round(after.voiceValidation.voiceRatio * 100)}%`}
+                  change={delta(
+                    before.voiceValidation.voiceRatio * 100,
+                    after.voiceValidation.voiceRatio * 100,
+                  )}
+                  improved={after.voiceValidation.voiceRatio >= before.voiceValidation.voiceRatio}
+                />
+              )}
             </div>
           </Card>
         </motion.div>

@@ -526,6 +526,14 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
       <div class="instruments">${escapeHtml(getHumanInstrumentSuggestion(richness))}</div>
     </div>
 
+    ${profile.voiceValidation?.status === 'warn' ? `
+    <div style="background:rgba(240,145,58,0.05);border:1px solid rgba(240,145,58,0.2);border-radius:12px;padding:16px;margin-bottom:24px;text-align:center;">
+      <div style="font-family:'DM Mono',monospace;font-size:12px;color:#F0913A;">
+        Recording conditions: ${Math.round(profile.voiceValidation.voiceRatio * 100)}% voice clarity.
+        Results may be less precise than a higher-clarity recording.
+      </div>
+    </div>` : ''}
+
     <div class="footer">
       <div class="brand">Harmonic Intake</div>
       <div class="disclaimer">

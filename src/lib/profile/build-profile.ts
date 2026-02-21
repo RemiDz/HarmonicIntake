@@ -1,4 +1,4 @@
-import type { FrequencyProfile, Overtone, VoiceProfile } from '@/lib/types';
+import type { FrequencyProfile, Overtone, VoiceProfile, VoiceValidation, VoiceValidationStatus } from '@/lib/types';
 import type { GlottalCycle } from '@/lib/audio/glottal-cycles';
 import { frequencyToNote } from '@/lib/music/note-mapping';
 import { frequencyToChakra } from '@/lib/music/chakra-mapping';
@@ -143,6 +143,8 @@ export interface RecordingData {
   sampleRate: number;
   fftSize: number;
   frozenWaveform: Float32Array | null;
+  voiceFrames: number;
+  totalFrames: number;
 }
 
 /**
@@ -241,6 +243,29 @@ export function buildProfile(data: RecordingData): FrequencyProfile {
       ? chakraScores.reduce((a, b) => (b.score > a.score ? b : a))
       : { name: chakra.name, color: chakra.color, score: 0, label: 'Quiet', description: '' };
 
+  // ── Voice Validation ──
+  const voiceRatio = data.totalFrames > 0 ? data.voiceFrames / data.totalFrames : 0;
+  const meanF0 = voiceProfile.fundamental.mean;
+  const f0CV = meanF0 > 0 ? voiceProfile.fundamental.stdDev / meanF0 : 0;
+
+  let validationStatus: VoiceValidationStatus;
+  if (voiceRatio < 0.2 || f0CV > 0.5) {
+    validationStatus = 'fail';
+  } else if (voiceRatio < 0.4 || voiceProfile.pitchRange.rangeSemitones > 24) {
+    validationStatus = 'warn';
+  } else {
+    validationStatus = 'pass';
+  }
+
+  const voiceValidation: VoiceValidation = {
+    voiceRatio: Math.round(voiceRatio * 1000) / 1000,
+    voiceFrames: data.voiceFrames,
+    totalFrames: data.totalFrames,
+    status: validationStatus,
+    f0StabilityCV: Math.round(f0CV * 1000) / 1000,
+    pitchRangeSemitones: voiceProfile.pitchRange.rangeSemitones,
+  };
+
   return {
     fundamental,
     noteInfo,
@@ -255,5 +280,6 @@ export function buildProfile(data: RecordingData): FrequencyProfile {
     voiceProfile,
     dominantChakra,
     frozenWaveform: data.frozenWaveform,
+    voiceValidation,
   };
 }
