@@ -16,7 +16,7 @@ interface LiveScreenProps {
 export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
   const progress = Math.min(data.elapsed / duration, 1);
   const circumference = 2 * Math.PI * 28;
-  const strokeDashoffset = circumference * (1 - progress);
+  const strokeDashoffset = circumference * progress;
   const timerColor = data.currentChakra?.color || 'var(--color-accent-primary)';
 
   return (
