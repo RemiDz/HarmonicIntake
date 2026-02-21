@@ -55,7 +55,7 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
-                style={{ transition: 'stroke-dashoffset 0.3s ease, stroke 0.5s ease' }}
+                style={{ transition: 'stroke 0.5s ease' }}
               />
             </svg>
             <span className="font-mono text-xs text-text-secondary">
