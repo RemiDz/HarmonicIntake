@@ -239,7 +239,7 @@ export const ProfileCard = forwardRef<HTMLDivElement, ProfileCardProps>(({ profi
           textTransform: 'uppercase' as const,
         }}
       >
-        harmonicintake.com
+        sonarus.app
       </div>
     </div>
   );

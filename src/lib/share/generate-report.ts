@@ -387,7 +387,7 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
 </head>
 <body>
   <div class="nav-bar">
-    <a class="nav-btn" href="https://harmonic-intake.vercel.app" onclick="if(window.opener||window.history.length<=1){window.close();return false;}">
+    <a class="nav-btn" href="https://sonarus.app" onclick="if(window.opener||window.history.length<=1){window.close();return false;}">
       <em class="btn-icon">←</em>
       <span class="btn-label">← Back</span>
     </a>
@@ -539,7 +539,7 @@ export function generateHTMLReport(profile: FrequencyProfile): void {
       <div class="disclaimer">
         This analysis explores the acoustic qualities of your voice through a wellness lens.
         It is not a medical or clinical assessment.<br><br>
-        <a href="https://harmonic-intake.vercel.app">harmonic-intake.vercel.app</a>
+        <a href="https://sonarus.app">sonarus.app</a>
       </div>
     </div>
 

@@ -215,5 +215,5 @@ This recording had ${Math.round(profile.voiceValidation.voiceRatio * 100)}% voic
 —
 With resonance,
 Harmonic Intake
-harmonicintake.com`;
+sonarus.app`;
 }

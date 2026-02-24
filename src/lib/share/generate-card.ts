@@ -100,7 +100,7 @@ function buildCardHTML(profile: FrequencyProfile): string {
 
   <!-- Footer -->
   <div style="position:absolute;bottom:60px;left:72px;right:72px;text-align:center;border-top:1px solid #162535;padding-top:20px;">
-    <div style="font-family:'DM Mono',monospace;font-size:16px;letter-spacing:4px;text-transform:uppercase;color:#3a5570;">harmonic-intake.vercel.app</div>
+    <div style="font-family:'DM Mono',monospace;font-size:16px;letter-spacing:4px;text-transform:uppercase;color:#3a5570;">sonarus.app</div>
   </div>
 
 </div>`;

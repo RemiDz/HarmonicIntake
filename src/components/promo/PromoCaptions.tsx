@@ -43,7 +43,7 @@ Harmonic Intake analyses your voice in 15 sec — frequency, chakra, overtones &
 
 Free. No sign-up. Browser only.
 
-harmonic-intake.vercel.app`,
+sonarus.app`,
     },
     {
       id: 'tiktok',
@@ -70,7 +70,7 @@ ${hook}
 It's called Harmonic Intake — you hum for 15 seconds and it gives you a full frequency profile with your note, chakra resonance, and session recommendations.
 
 Completely free, nothing to download, works in the browser:
-harmonic-intake.vercel.app
+sonarus.app
 
 I thought you'd love it for your practice.`,
     },
@@ -94,7 +94,7 @@ No app download. No accounts. No data stored. It runs entirely in the browser us
 
 If you work with sound, voice, breath, or energy — I'd love your feedback.
 
-harmonic-intake.vercel.app
+sonarus.app
 
 #SoundHealing #WellnessTech #VocalAnalysis #FrequencyHealing #HolisticHealth`,
     },

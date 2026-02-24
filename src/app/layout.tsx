@@ -25,7 +25,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://harmonicintake.com'),
+  metadataBase: new URL('https://sonarus.app'),
   title: 'Harmonic Intake — Vocal Frequency Analysis for Practitioners',
   description:
     'Discover your unique frequency profile in 15 seconds. Real-time vocal analysis with 10 biomarkers, chakra energy mapping, and personalised sound healing guidance. Free, no sign-up, runs in your browser.',
