@@ -1,4 +1,4 @@
-const NOISE_THRESHOLD = 0.01;
+const NOISE_THRESHOLD = 0.003;
 const MIN_FREQ = 50;
 const MAX_FREQ = 600;
 
@@ -80,7 +80,7 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): number {
   // 5. Confidence check: compare peak autocorrelation to zero-lag energy
   // Zero-lag of normalized buffer = n, so confidence = bestVal / n
   const confidence = bestVal / n;
-  if (confidence < 0.5) return -1;
+  if (confidence < 0.35) return -1;
 
   // 6. Parabolic interpolation around the peak for sub-sample accuracy
   const prev = _autocorrBuf[bestLag - 1] || 0;

@@ -75,6 +75,7 @@ export function useAudioAnalysis() {
   const lastHzRef = useRef(-1);
   const voiceFramesRef = useRef(0);
   const totalFramesRef = useRef(0);
+  const pitchStreakRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -182,18 +183,29 @@ export function useAudioAnalysis() {
     }
 
     // ── Voice validation tracking ──
+    // Pitch is the PRIMARY signal — if autocorrelation found a fundamental,
+    // it's voice regardless of amplitude (quiet humming is still tonal).
     totalFramesRef.current++;
     let liveVoiceStatus: LiveVoiceStatus;
 
-    if (rms < 0.01) {
-      liveVoiceStatus = 'silence';
-    } else if (runPitchFrame && flatness > 0.5) {
-      liveVoiceStatus = 'noise';
-    } else if (hz > 0) {
+    if (hz > 0) {
       liveVoiceStatus = 'voice-detected';
       voiceFramesRef.current++;
+      pitchStreakRef.current++;
+    } else if (pitchStreakRef.current >= 120 && rms > 0.002) {
+      // Sustained pitch for 2+ seconds — brief dropout, still likely voice
+      liveVoiceStatus = 'voice-detected';
+      voiceFramesRef.current++;
+      pitchStreakRef.current = Math.max(0, pitchStreakRef.current - 10);
     } else {
-      liveVoiceStatus = 'low-volume';
+      pitchStreakRef.current = 0;
+      if (rms < 0.003) {
+        liveVoiceStatus = 'silence';
+      } else if (runPitchFrame && flatness > 0.5) {
+        liveVoiceStatus = 'noise';
+      } else {
+        liveVoiceStatus = 'low-volume';
+      }
     }
 
     const voiceClarity = totalFramesRef.current > 0
@@ -240,7 +252,7 @@ export function useAudioAnalysis() {
 
     // Always capture the latest waveform frame with valid pitch.
     // The last captured frame becomes the frozen "voice signature".
-    if (hz > 0 && rms > 0.01) {
+    if (hz > 0 && rms > 0.003) {
       frozenWaveformRef.current = new Float32Array(timeDomain);
     }
 
@@ -292,6 +304,7 @@ export function useAudioAnalysis() {
       lastHzRef.current = -1;
       voiceFramesRef.current = 0;
       totalFramesRef.current = 0;
+      pitchStreakRef.current = 0;
 
       const recorder = await startRecording();
       recorderRef.current = recorder;

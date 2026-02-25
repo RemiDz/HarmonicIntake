@@ -22,10 +22,10 @@ const fadeInUp = {
 };
 
 const tips = [
-  'Find a quiet space away from background noise',
-  'Hold your phone 15\u201320 cm from your mouth',
-  'Hum a steady \u201Cahhh\u201D or \u201Commm\u201D for the full 15 seconds',
-  'Try a lower, more sustained tone rather than speaking',
+  'Try humming louder or using an open \u201Cahhh\u201D sound',
+  'Hold your phone closer to your mouth (10\u201315 cm)',
+  'Sustain a steady tone for the full 15 seconds \u2014 \u201Cooommm\u201D works great',
+  'Find a quieter spot away from fans, music, or conversation',
 ];
 
 export function VoiceValidationFailed({ voiceRatio, onRetry, onReset }: VoiceValidationFailedProps) {
@@ -52,11 +52,11 @@ export function VoiceValidationFailed({ voiceRatio, onRetry, onReset }: VoiceVal
             </span>
           </div>
           <h2 className="font-display text-2xl font-light text-text-primary">
-            We couldn&apos;t detect a clear voice in this recording
+            We need a bit more voice signal
           </h2>
           <p className="mt-3 text-sm leading-relaxed text-text-secondary">
             Only {Math.round(voiceRatio * 100)}% of the recording contained a clear vocal signal.
-            We need at least 20% for a meaningful analysis.
+            Try humming louder or using an open &quot;ahhh&quot; sound, and hold your phone closer to your mouth.
           </p>
         </motion.div>
 

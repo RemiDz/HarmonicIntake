@@ -249,9 +249,9 @@ export function buildProfile(data: RecordingData): FrequencyProfile {
   const f0CV = meanF0 > 0 ? voiceProfile.fundamental.stdDev / meanF0 : 0;
 
   let validationStatus: VoiceValidationStatus;
-  if (voiceRatio < 0.2 || f0CV > 0.5) {
+  if (voiceRatio < 0.1 || f0CV > 0.5) {
     validationStatus = 'fail';
-  } else if (voiceRatio < 0.4 || voiceProfile.pitchRange.rangeSemitones > 24) {
+  } else if (voiceRatio < 0.25 || voiceProfile.pitchRange.rangeSemitones > 24) {
     validationStatus = 'warn';
   } else {
     validationStatus = 'pass';
