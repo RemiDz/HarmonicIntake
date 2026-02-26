@@ -19,6 +19,21 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
   const strokeDashoffset = circumference * progress;
   const timerColor = data.currentChakra?.color || 'var(--color-accent-primary)';
 
+  // DEBUG — remove after verifying the countdown ring animates correctly
+  if (Math.round(data.elapsed) !== Math.round(data.elapsed - 0.016)) {
+    // Log roughly once per second
+    if (data.elapsed > 0 && data.elapsed % 1 < 0.05) {
+      console.log('[Timer Ring]', {
+        r: 28,
+        circumference: circumference.toFixed(2),
+        strokeDasharray: circumference.toFixed(2),
+        strokeDashoffset: strokeDashoffset.toFixed(2),
+        elapsed: data.elapsed.toFixed(2),
+        progress: progress.toFixed(3),
+      });
+    }
+  }
+
   return (
     <motion.div
       className="flex min-h-screen flex-col items-center px-6 py-8"
@@ -52,10 +67,12 @@ export function LiveScreen({ data, onStop, duration = 15 }: LiveScreenProps) {
                 fill="none"
                 stroke={timerColor}
                 strokeWidth="2"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
-                style={{ transition: 'stroke 0.5s ease' }}
+                style={{
+                  strokeDasharray: circumference,
+                  strokeDashoffset: strokeDashoffset,
+                  transition: 'stroke 0.5s ease',
+                }}
               />
             </svg>
             <span className="font-mono text-xs text-text-secondary">
