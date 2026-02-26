@@ -36,6 +36,17 @@
 
 /* ── Base Styles ── */
 
+html, body {
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
 html {
   color-scheme: dark;
 }
