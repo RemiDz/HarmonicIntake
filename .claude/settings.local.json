@@ -21,7 +21,8 @@
       "Bash(cd \"C:/Users/rdzingel/Documents/MY_APPS/HARMONIC_WAVES/sonarus.app\" && npx vercel --prod 2>&1)",
       "Bash(cd \"C:/Users/rdzingel/Documents/MY_APPS/HARMONIC_WAVES/sonarus.app\" && npx vercel --prod --scope remis-projects-65c6d3fa 2>&1)",
       "Bash(cd \"C:/Users/rdzingel/Documents/MY_APPS/HARMONIC_WAVES/sonarus.app\" && npx vercel --prod --scope remis-projects-65c6d3fa --yes 2>&1)",
-      "Bash(cd \"C:\\\\Users\\\\rdzingel\\\\Documents\\\\MY_APPS\\\\HARMONIC_WAVES\\\\sonarus.app\" && npx vercel --prod --yes 2>&1)"
+      "Bash(cd \"C:\\\\Users\\\\rdzingel\\\\Documents\\\\MY_APPS\\\\HARMONIC_WAVES\\\\sonarus.app\" && npx vercel --prod --yes 2>&1)",
+      "Bash(npx vercel:*)"
     ]
   }
 }
