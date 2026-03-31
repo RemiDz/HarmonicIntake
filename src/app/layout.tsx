@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import { Cormorant_Garamond, DM_Mono } from 'next/font/google';
 import './globals.css';
 import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
+import { Analytics } from '@vercel/analytics/next';
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -83,6 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <ServiceWorkerRegistrar />
+        <Analytics />
       </body>
     </html>
   );
